@@ -29,6 +29,7 @@ tmp/
 
 # Coverage tool output
 *.out
+coverage.txt
 coverage.html
 
 .DS_Store
