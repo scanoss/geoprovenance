@@ -30,7 +30,7 @@ unit_test: version ## Run all unit tests in the pkg folder
 
 unit_test_coverage:  ## Run all unit tests in the pkg folder and get test coverage
 	@echo "Running unit test with coverage..."
-	go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out && go tool cover -o coverage.html -html=coverage.out
+	go test -coverprofile=coverage.txt ./... && go tool cover -func=coverage.txt && go tool cover -o coverage.html -html=coverage.txt
 
 lint_local: ## Run local instance of linting across the code base
 	golangci-lint run ./...
