@@ -79,7 +79,6 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
 		return &pb.ContributorResponse{Status: &statusResp}, nil
 	}
-	//zlog.S.Debugf("Parsed Provenance: %+v", dtoProv)
 	provResponse, err := convertProvenanceOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
 		s.Errorf("Failed to covnert parsed dependencies: %v", err)
@@ -140,7 +139,6 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
 		return &pb.OriginResponse{Status: &statusResp}, nil
 	}
-	//zlog.S.Debugf("Parsed Provenance: %+v", dtoProv)
 	provResponse, err := convertOriginOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
 		s.Errorf("Failed to covnert parsed dependencies: %v", err)

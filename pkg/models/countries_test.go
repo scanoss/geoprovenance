@@ -27,7 +27,7 @@ import (
 	"math/rand/v2"
 )
 
-func TestCountryLookoup(t *testing.T) {
+func TestCountryLookUp(t *testing.T) {
 	ctx := context.Background()
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
@@ -50,7 +50,7 @@ func TestCountryLookoup(t *testing.T) {
 	}
 	countryModel := NewCountryMapModel(ctx, conn)
 	countriesToPick := []string{"Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria"}
-	
+
 	randomIndex := rand.IntN(len(countriesToPick))
 	dbPK := randomIndex + 1
 

@@ -25,7 +25,7 @@ Two endpoints are available for this.
 
 ## [0.1.0] - 2025-04-24
 ### Added
-- Added origin endpoint. This let the user to retrieve countries distribution for a given purl.
+- Added origin endpoint. This lets the users get countries distribution for a given purl.
 ## Updated
 - Updated Go version to v1.24
 

@@ -11,9 +11,11 @@ The [scripts](.) folder contains an [env-setup.sh](env-setup.sh) script which at
 
 A sample development configuration file can be found in [config/app-config-dev.json](../config/app-config-dev.json).
 
-Logs are written by default to `/var/log/scanoss/geoprovenance/scanoss-geoprovenance-api-prod.log`.
+Logs are written by default to `/var/log/scanoss/geoprovenance/scanoss-geoprovenance-api-prod.log`
 
-Configuration is written by default to: `/usr/local/etc/scanoss/geoprovenance`.
+Configuration is written by default to: `/usr/local/etc/scanoss/geoprovenance`
+
+The database is stored by default to: `/var/lib/scanoss/db/sqlite/geoprovenance`
 
 ## Installation
 Running the [env-setup.sh](env-setup.sh) on the target server takes care of the installation. Simply run:

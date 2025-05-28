@@ -41,7 +41,7 @@ func NewCountryMapModel(ctx context.Context, conn *sqlx.Conn) *CountriesModel {
 
 var countryMap map[int]string
 
-// GetCountryById retreives a list of the Purl Type IDs associated with the given Purl Type (string)
+// GetCountryById Gets a list of the Purl Type IDs associated with the given Purl Type (string)
 func (m *CountriesModel) GetCountryById(id int) (string, error) {
 
 	if countryMap == nil {
@@ -67,10 +67,3 @@ func (m *CountriesModel) GetCountryById(id int) (string, error) {
 		return c, nil
 	}
 }
-
-/*
-}
-	zlog.S.Error("No entries found in the mines table.")
-	return nil, errors.New("no entry in mines table")
-}
-*/
