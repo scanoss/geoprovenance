@@ -56,8 +56,8 @@ func existPurl(purls []string, purl string) bool {
 	return false
 }
 
-func NewProvenance(ctx context.Context, conn *sqlx.Conn) *ProvenanceUseCase {
-	return &ProvenanceUseCase{ctx: ctx, conn: conn}
+func NewProvenance(ctx context.Context, conn *sqlx.Conn, s *zap.SugaredLogger) *ProvenanceUseCase {
+	return &ProvenanceUseCase{ctx: ctx, conn: conn, s: s}
 }
 
 // GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
@@ -68,18 +68,9 @@ func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.Pro
 		return dtos.ProvenanceOutput{}, models.QuerySummary{}, errors.New("empty list of purls")
 	}
 	summary := models.QuerySummary{}
-	purls := []string{}
+	var purls []string
 	//Prepare purls to query
 	for _, purl := range request.Purls {
-
-		/*	purlReq := strings.Split(purl.Purl, "@") // Remove any version specific info from the PURL
-				if purlReq[0] == "" {
-					continue
-				}
-			if len(purlReq) > 1 {
-					purl.Requirement = purlReq[1]
-				}
-		*/
 		purlName, err := utils.PurlNameFromString(purl.Purl) // Make sure we just have the bare minimum for a Purl Name
 		if err == nil {
 			// to avoid SQL Injection
@@ -93,12 +84,12 @@ func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.Pro
 	prov := models.NewProvenanceModel(p.ctx, p.conn)
 	countries := models.NewCountryMapModel(p.ctx, p.conn)
 
-	vendors, err := prov.GetProvenanceByPurlNames(purls, "")
+	vendors, err := prov.GetProvenanceByPurlNames(purls)
 	if err != nil {
 		return dtos.ProvenanceOutput{}, models.QuerySummary{}, err
 	}
 
-	tooMany, err2many := prov.GetTooManyContributors(purls, "github")
+	tooMany, err2many := prov.GetTooManyContributors(purls)
 	if err2many != nil {
 		return dtos.ProvenanceOutput{}, models.QuerySummary{}, err2many
 	}

@@ -39,7 +39,9 @@ func NewOrigin(ctx context.Context, conn *sqlx.Conn) *OriginUseCase {
 	return &OriginUseCase{ctx: ctx, conn: conn}
 }
 
-// GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
+// GetOrigin takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
+//
+//goland:noinspection ALL
 func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutput, models.QuerySummary, error) {
 
 	if len(request.Purls) == 0 {
@@ -47,8 +49,7 @@ func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutpu
 		return dtos.OriginOutput{}, models.QuerySummary{}, errors.New("empty list of purls")
 	}
 	summary := models.QuerySummary{}
-	purls := []string{}
-
+	var purls []string
 	resMaps := make(map[string][]models.LocationDistribution)
 
 	//Prepare purls to query
@@ -70,7 +71,7 @@ func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutpu
 	mapTotal := make(map[string]int16)
 	for _, p := range purls {
 		mapOrigins := make(map[string]int16)
-		tz, _ := prov.GetTimeZoneOriginByPurlName(p, "github")
+		tz, _ := prov.GetTimeZoneOriginByPurlName(p)
 		for _, v := range tz {
 			if count, exist := mapOrigins[v.CountryName]; !exist {
 				mapOrigins[v.CountryName] = int16(v.ContributorCount)
@@ -82,13 +83,13 @@ func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutpu
 		}
 
 		for k, v := range mapOrigins {
-			var percentage float32 = float32(v*100) / float32(mapTotal[p])
+			var percentage = float32(v*100) / float32(mapTotal[p])
 			resMaps[p] = append(resMaps[p], models.LocationDistribution{CountryName: k, ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100)})
 		}
 	}
 
 	retV := dtos.OriginOutput{}
-	tooMany, err2many := prov.GetTooManyContributors(purls, "github")
+	tooMany, err2many := prov.GetTooManyContributors(purls)
 	if err2many != nil {
 		return dtos.OriginOutput{}, models.QuerySummary{}, err2many
 	}

@@ -149,6 +149,11 @@ func TestConvertPurlString(t *testing.T) {
 			want:  "pkg:github/scanoss/papi",
 		},
 		{
+			name:  "Golang3",
+			input: "pkg:golang/github.com/",
+			want:  "pkg:github/",
+		},
+		{
 			name:  "Empty String",
 			input: "",
 			want:  "",

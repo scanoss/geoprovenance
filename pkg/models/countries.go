@@ -34,14 +34,14 @@ type countryRow struct {
 	Country string `db:"country_name"`
 }
 
-// NewMineModel creates a new instance of the Mine Model
+// NewCountryMapModel creates a new instance of the Mine Model
 func NewCountryMapModel(ctx context.Context, conn *sqlx.Conn) *CountriesModel {
 	return &CountriesModel{ctx: ctx, conn: conn}
 }
 
 var countryMap map[int]string
 
-// GetMineIdsByPurlType retreives a list of the Purl Type IDs associated with the given Purl Type (string)
+// GetCountryById Gets a list of the Purl Type IDs associated with the given Purl Type (string)
 func (m *CountriesModel) GetCountryById(id int) (string, error) {
 
 	if countryMap == nil {
@@ -62,15 +62,8 @@ func (m *CountriesModel) GetCountryById(id int) (string, error) {
 	}
 	c, exist := countryMap[id]
 	if !exist {
-		return "N/A", fmt.Errorf("Coutry not found")
+		return "N/A", fmt.Errorf("coutry not found")
 	} else {
 		return c, nil
 	}
 }
-
-/*
-}
-	zlog.S.Error("No entries found in the mines table.")
-	return nil, errors.New("no entry in mines table")
-}
-*/

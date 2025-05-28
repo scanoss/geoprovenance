@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jmoiron/sqlx"
+	_ "modernc.org/sqlite"
 	zlog "scanoss.com/provenance/pkg/logger"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func TestVersionsSearch(t *testing.T) {
@@ -32,7 +34,7 @@ func TestVersionsSearch(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
 	}
 	defer zlog.SyncZap()
-	db, err := sqlx.Connect("sqlite3", ":memory:")
+	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -106,7 +108,7 @@ func TestVersionsSearchBadSql(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
 	}
 	defer zlog.SyncZap()
-	db, err := sqlx.Connect("sqlite3", ":memory:")
+	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}

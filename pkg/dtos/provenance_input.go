@@ -35,15 +35,14 @@ type ProvenanceInputItem struct {
 
 // ParseProvenanceInput converts the input byte array to a ProvenanceInput structure
 func ParseProvenanceInput(s *zap.SugaredLogger, input []byte) (ProvenanceInput, error) {
-
-	if input == nil || len(input) == 0 {
+	if len(input) == 0 {
 		return ProvenanceInput{}, errors.New("no purl info data supplied to parse")
 	}
 	var data ProvenanceInput
 	err := json.Unmarshal(input, &data)
 	if err != nil {
 		s.Errorf("Parse failure: %v", err)
-		return ProvenanceInput{}, errors.New(fmt.Sprintf("failed to parse provenance input data: %v", err))
+		return ProvenanceInput{}, fmt.Errorf("failed to parse provenance input data: %v", err)
 	}
 	s.Debugf("Parsed data2: %v", data)
 	return data, nil

@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -53,7 +54,7 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 	s := ctxzap.Extract(ctx).Sugar()
 	// Make sure we have Provenance data to query
 	reqPurls := request.GetPurls()
-	if reqPurls == nil || len(reqPurls) == 0 {
+	if len(reqPurls) == 0 {
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "No purls in request data supplied"}
 		return &pb.ContributorResponse{Status: &statusResp}, errors.New("no purl data supplied")
 	}
@@ -70,7 +71,7 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 	}
 	defer closeDbConnection(conn)
 	// Search the KB for information about each Provenance
-	provUc := usecase.NewProvenance(ctx, conn)
+	provUc := usecase.NewProvenance(ctx, conn, s)
 	dtoProv, summary, err := provUc.GetProvenance(dtoRequest)
 
 	if err != nil {
@@ -78,7 +79,6 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
 		return &pb.ContributorResponse{Status: &statusResp}, nil
 	}
-	//zlog.S.Debugf("Parsed Provenance: %+v", dtoProv)
 	provResponse, err := convertProvenanceOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
 		s.Errorf("Failed to covnert parsed dependencies: %v", err)
@@ -88,14 +88,9 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 	// Set the status and respond with the data
 
 	statusResp := common.StatusResponse{Status: common.StatusCode_SUCCESS, Message: "Success"}
-	messages := []string{}
+	var messages []string
 	if len(summary.PurlsFailedToParse) > 0 {
 		messages = append(messages, fmt.Sprintf("Failed to parse: %s", strings.Join(summary.PurlsFailedToParse, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-
-	if len(summary.PurlsNotFound) > 0 {
-		messages = append(messages, fmt.Sprintf("Can't find purl(s): %s", strings.Join(summary.PurlsNotFound, ", ")))
 		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
 	}
 	if len(summary.PurlsWOInfo) > 0 {
@@ -119,7 +114,7 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 	s := ctxzap.Extract(ctx).Sugar()
 	// Make sure we have Provenance data to query
 	reqPurls := request.GetPurls()
-	if reqPurls == nil || len(reqPurls) == 0 {
+	if len(reqPurls) == 0 {
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "No purls in request data supplied"}
 		return &pb.OriginResponse{Status: &statusResp}, errors.New("no purl data supplied")
 	}
@@ -144,7 +139,6 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
 		return &pb.OriginResponse{Status: &statusResp}, nil
 	}
-	//zlog.S.Debugf("Parsed Provenance: %+v", dtoProv)
 	provResponse, err := convertOriginOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
 		s.Errorf("Failed to covnert parsed dependencies: %v", err)
@@ -155,18 +149,9 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 	// Set the status and respond with the data
 
 	statusResp := common.StatusResponse{Status: common.StatusCode_SUCCESS, Message: "Success"}
-	messages := []string{}
+	var messages []string
 	if len(summary.PurlsFailedToParse) > 0 {
 		messages = append(messages, fmt.Sprintf("Failed to parse: %s", strings.Join(summary.PurlsFailedToParse, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-
-	if len(summary.PurlsNotFound) > 0 {
-		messages = append(messages, fmt.Sprintf("Can't find purl(s): %s", strings.Join(summary.PurlsNotFound, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-	if len(summary.PurlsWOInfo) > 0 {
-		messages = append(messages, fmt.Sprintf("Can't find information for: %s", strings.Join(summary.PurlsWOInfo, ", ")))
 		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
 	}
 	if len(summary.PurlsTooMuchData) > 0 {
@@ -184,10 +169,8 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 
 // closeDbConnection closes the specified database connection
 func closeDbConnection(conn *sqlx.Conn) {
-
-	//zlog.S.Debugf("Closing DB Connection: %+v", conn)
 	err := conn.Close()
 	if err != nil {
-		//	zlog.S.Warnf("Warning: Problem closing database connection: %v", err)
+		zlog.S.Warnf("Warning: Problem closing database connection: %v", err)
 	}
 }

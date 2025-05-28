@@ -28,7 +28,7 @@ import (
 	zlog "scanoss.com/provenance/pkg/logger"
 )
 
-type versionModel struct {
+type VersionModel struct {
 	ctx  context.Context
 	conn *sqlx.Conn
 }
@@ -42,12 +42,12 @@ type Version struct {
 // TODO add cache for versions already searched for?
 
 // NewVersionModel creates a new instance of the Version Model
-func NewVersionModel(ctx context.Context, conn *sqlx.Conn) *versionModel {
-	return &versionModel{ctx: ctx, conn: conn}
+func NewVersionModel(ctx context.Context, conn *sqlx.Conn) *VersionModel {
+	return &VersionModel{ctx: ctx, conn: conn}
 }
 
 // GetVersionByName gets the given version from the versions table
-func (m *versionModel) GetVersionByName(name string, create bool) (Version, error) {
+func (m *VersionModel) GetVersionByName(name string, create bool) (Version, error) {
 	if len(name) == 0 {
 		zlog.S.Error("Please specify a valid Version Name to query")
 		return Version{}, errors.New("please specify a valid Version Name to query")
@@ -57,7 +57,7 @@ func (m *versionModel) GetVersionByName(name string, create bool) (Version, erro
 		"SELECT id, version_name, semver FROM versions"+
 			" WHERE version_name = $1",
 		name).StructScan(&version)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		zlog.S.Errorf("Error: Failed to query versions table for %v: %v", name, err)
 		return Version{}, fmt.Errorf("failed to query the versions table: %v", err)
 	}
@@ -69,7 +69,7 @@ func (m *versionModel) GetVersionByName(name string, create bool) (Version, erro
 }
 
 // saveVersion writes the given version name to the versions table
-func (m *versionModel) saveVersion(name string) (Version, error) {
+func (m *VersionModel) saveVersion(name string) (Version, error) {
 	if len(name) == 0 {
 		zlog.S.Error("Please specify a valid version Name to save")
 		return Version{}, errors.New("please specify a valid Version Name to save")

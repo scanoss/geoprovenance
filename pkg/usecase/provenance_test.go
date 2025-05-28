@@ -19,28 +19,17 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"testing"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
-	"github.com/mattn/go-sqlite3"
-	_ "github.com/mattn/go-sqlite3"
 	myconfig "scanoss.com/provenance/pkg/config"
 	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
-
-func concat(args ...interface{}) (string, error) {
-	var result string
-	for _, arg := range args {
-		if arg != nil {
-			result += fmt.Sprint(arg)
-		}
-	}
-	return result, nil
-}
 
 func TestProvenanceUseCase(t *testing.T) {
 
@@ -52,8 +41,7 @@ func TestProvenanceUseCase(t *testing.T) {
 	ctx := context.Background()
 	ctx = ctxzap.ToContext(ctx, zlog.L)
 	s := ctxzap.Extract(ctx).Sugar()
-	_ = s
-	db, err := sqlx.Connect("sqlite3", ":memory:")
+	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -63,22 +51,6 @@ func TestProvenanceUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	sqliteConn := conn.Raw(func(driverConn interface{}) error {
-		if sqliteConn, ok := driverConn.(*sqlite3.SQLiteConn); ok {
-			// Registrar la función CONCAT
-			err := sqliteConn.RegisterFunc("CONCAT", concat, true)
-			if err != nil {
-				return fmt.Errorf("error al registrar la función CONCAT: %w", err)
-			}
-		} else {
-			return fmt.Errorf("No se pudo obtener la conexión subyacente de SQLite")
-		}
-		return nil
-	})
-	if err != nil {
-		log.Fatal("Error al registrar la función CONCAT:", err)
-	}
-	_ = sqliteConn
 	defer models.CloseConn(conn)
 	err = models.LoadTestSqlData(db, ctx, conn)
 	if err != nil {
@@ -97,7 +69,7 @@ func TestProvenanceUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load Config: %v", err)
 	}
-	provUc := NewProvenance(ctx, conn)
+	provUc := NewProvenance(ctx, conn, s)
 
 	requestDto, err := dtos.ParseProvenanceInput(s, []byte(provRequest))
 	if err != nil {
@@ -117,7 +89,6 @@ func TestProvenanceUseCase(t *testing.T) {
 	   		    "purls": [
 	   		        {
 	   		          "purl": "pkg:npm/"
-
 	   		        }
 	   		  ]
 	   		}
@@ -132,6 +103,16 @@ func TestProvenanceUseCase(t *testing.T) {
 	countries, _, err = provUc.GetProvenance(requestDto)
 
 	if err == nil && len(countries.Provenance) > 0 {
+		t.Fatalf("did not get an expected error: %v", countries)
+	}
+
+	emptyReq, err := dtos.ParseProvenanceInput(s, []byte(`{ "purls": [] }`))
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when parsing input json", err)
+	}
+	fmt.Printf("requestDto: %+v\n", emptyReq)
+	countries, _, err = provUc.GetProvenance(emptyReq)
+	if err == nil {
 		t.Fatalf("did not get an expected error: %v", countries)
 	}
 

@@ -25,15 +25,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golobby/config/v3"
-	"github.com/golobby/config/v3/pkg/feeder"
 	_ "github.com/lib/pq"
-	"github.com/scanoss/go-grpc-helper/pkg/files"
 	gd "github.com/scanoss/go-grpc-helper/pkg/grpc/database"
 	gs "github.com/scanoss/go-grpc-helper/pkg/grpc/server"
 	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
-
+	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
+
+	"github.com/golobby/config/v3"
+	"github.com/golobby/config/v3/pkg/feeder"
+	"github.com/scanoss/go-grpc-helper/pkg/files"
 
 	"scanoss.com/provenance/pkg/protocol/grpc"
 	"scanoss.com/provenance/pkg/protocol/rest"
@@ -45,7 +46,7 @@ import (
 
 var version string
 
-// getConfig checks command line args for option to feed into the config parser.
+// getConfig checks command line args for an option to feed into the config parser.
 func getConfig() (*myconfig.ServerConfig, error) {
 	var jsonConfig, envConfig string
 	flag.StringVar(&jsonConfig, "json-config", "", "Application JSON config")
@@ -100,7 +101,7 @@ func RunServer() error {
 	}
 
 	zlog.S.Infof("Starting SCANOSS Provenance Service: %v", strings.TrimSpace(version))
-	// Setup database connection pool
+	// Set up the database connection pool
 	db, err := gd.OpenDBConnection(cfg.Database.Dsn, cfg.Database.Driver, cfg.Database.User, cfg.Database.Passwd,
 		cfg.Database.Host, cfg.Database.Schema, cfg.Database.SslMode)
 	if err != nil {
