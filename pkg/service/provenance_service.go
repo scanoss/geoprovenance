@@ -19,16 +19,13 @@ package service
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
-	"strings"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
+	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
 	myconfig "scanoss.com/provenance/pkg/config"
+	se "scanoss.com/provenance/pkg/errors"
 	"scanoss.com/provenance/pkg/usecase"
 )
 
@@ -52,82 +49,49 @@ func (p provenanceServer) Echo(ctx context.Context, request *common.EchoRequest)
 
 func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) {
 	s := ctxzap.Extract(ctx).Sugar()
-	// Make sure we have Provenance data to query
-	reqPurls := request.GetPurls()
-	if len(reqPurls) == 0 {
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "No purls in request data supplied"}
-		return &pb.ContributorResponse{Status: &statusResp}, errors.New("no purl data supplied")
-	}
-	dtoRequest, err := convertProvenanceInput(s, request) // Convert to internal DTO for processing
+	dtoRequest, err := convertProvenanceInput(request) // Convert to internal DTO for processing
 	if err != nil {
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problem parsing Provenance input data"}
-		return &pb.ContributorResponse{Status: &statusResp}, errors.New("problem parsing Provenance input data")
+		return &pb.ContributorResponse{Status: se.HandleServiceError(ctx, s, err)}, nil
 	}
 	conn, err := p.db.Connx(ctx) // Get a connection from the pool
 	if err != nil {
 		s.Errorf("Failed to get a database connection from the pool: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Failed to get database pool connection"}
-		return &pb.ContributorResponse{Status: &statusResp}, errors.New("problem getting database pool connection")
+		return &pb.ContributorResponse{Status: se.HandleServiceError(ctx, s, se.NewInternalError("problem getting database pool connection", err))}, nil
 	}
 	defer closeDbConnection(conn)
 	// Search the KB for information about each Provenance
 	provUc := usecase.NewProvenance(ctx, conn, s)
 	dtoProv, summary, err := provUc.GetProvenance(dtoRequest)
-
 	if err != nil {
 		s.Errorf("Failed to get provenance: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
-		return &pb.ContributorResponse{Status: &statusResp}, nil
+		return &pb.ContributorResponse{Status: se.HandleServiceError(ctx, s, se.NewNotFoundError("Problems encountered extracting Provenance data"))}, nil
 	}
+
 	provResponse, err := convertProvenanceOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
-		s.Errorf("Failed to covnert parsed dependencies: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
-		return &pb.ContributorResponse{Status: &statusResp}, nil
+		return &pb.ContributorResponse{Status: se.HandleServiceError(ctx, s, se.NewInternalError("Problems encountered extracting Provenance data", err))}, nil
 	}
+
+	statusResp, err := buildStatusResponse(ctx, s, summary)
 	// Set the status and respond with the data
-
-	statusResp := common.StatusResponse{Status: common.StatusCode_SUCCESS, Message: "Success"}
-	var messages []string
-	if len(summary.PurlsFailedToParse) > 0 {
-		messages = append(messages, fmt.Sprintf("Failed to parse: %s", strings.Join(summary.PurlsFailedToParse, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
+	if err != nil {
+		return &pb.ContributorResponse{Status: se.HandleServiceError(ctx, s, err)}, nil
 	}
-	if len(summary.PurlsWOInfo) > 0 {
-		messages = append(messages, fmt.Sprintf("Can't find information for: %s", strings.Join(summary.PurlsWOInfo, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-	if len(summary.PurlsTooMuchData) > 0 {
-		messages = append(messages, fmt.Sprintf("Too many contributors for: %s", strings.Join(summary.PurlsTooMuchData, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-	if len(messages) == 0 {
-		statusResp.Message = "Success"
-	} else {
-		statusResp.Message = strings.Join(messages, ";")
-	}
-
-	return &pb.ContributorResponse{Purls: provResponse.Purls, Status: &statusResp}, nil
+	return &pb.ContributorResponse{Purls: provResponse.Purls, Status: statusResp}, nil
 }
 
 func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) {
 	s := ctxzap.Extract(ctx).Sugar()
 	// Make sure we have Provenance data to query
-	reqPurls := request.GetPurls()
-	if len(reqPurls) == 0 {
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "No purls in request data supplied"}
-		return &pb.OriginResponse{Status: &statusResp}, errors.New("no purl data supplied")
-	}
-	dtoRequest, err := convertProvenanceInput(s, request) // Convert to internal DTO for processing
+	dtoRequest, err := convertProvenanceInput(request) // Convert to internal DTO for processing
 	if err != nil {
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problem parsing Provenance input data"}
-		return &pb.OriginResponse{Status: &statusResp}, errors.New("problem parsing Provenance input data")
+		return &pb.OriginResponse{Status: se.HandleServiceError(ctx, s, err)}, nil
 	}
+
 	conn, err := p.db.Connx(ctx) // Get a connection from the pool
 	if err != nil {
 		s.Errorf("Failed to get a database connection from the pool: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Failed to get database pool connection"}
-		return &pb.OriginResponse{Status: &statusResp}, errors.New("problem getting database pool connection")
+		return &pb.OriginResponse{Status: se.HandleServiceError(ctx, s, se.NewInternalError("problem getting database pool connection", err))}, nil
 	}
 	defer closeDbConnection(conn)
 	// Search the KB for information about each Provenance
@@ -136,35 +100,21 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 
 	if err != nil {
 		s.Errorf("Failed to get provenance: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
-		return &pb.OriginResponse{Status: &statusResp}, nil
+		return &pb.OriginResponse{Status: se.HandleServiceError(ctx, s, se.NewNotFoundError("Problems encountered extracting Provenance data"))}, nil
 	}
 	provResponse, err := convertOriginOutput(s, dtoProv) // Convert the internal data into a response object
 	if err != nil {
-		s.Errorf("Failed to covnert parsed dependencies: %v", err)
-		statusResp := common.StatusResponse{Status: common.StatusCode_FAILED, Message: "Problems encountered extracting Provenance data"}
-		return &pb.OriginResponse{Status: &statusResp}, nil
+		return &pb.OriginResponse{Status: se.HandleServiceError(ctx, s, se.NewInternalError("Problems encountered extracting Provenance data", err))}, nil
 	}
 	_ = provResponse
 	// Set the status and respond with the data
 
-	statusResp := common.StatusResponse{Status: common.StatusCode_SUCCESS, Message: "Success"}
-	var messages []string
-	if len(summary.PurlsFailedToParse) > 0 {
-		messages = append(messages, fmt.Sprintf("Failed to parse: %s", strings.Join(summary.PurlsFailedToParse, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
+	statusResp, err := buildStatusResponse(ctx, s, summary)
+	// Set the status and respond with the data
+	if err != nil {
+		return &pb.OriginResponse{Status: se.HandleServiceError(ctx, s, err)}, nil
 	}
-	if len(summary.PurlsTooMuchData) > 0 {
-		messages = append(messages, fmt.Sprintf("Too many contributors for: %s", strings.Join(summary.PurlsTooMuchData, ", ")))
-		statusResp.Status = common.StatusCode_SUCCEEDED_WITH_WARNINGS
-	}
-	if len(messages) == 0 {
-		statusResp.Message = "Success"
-	} else {
-		statusResp.Message = strings.Join(messages, ";")
-	}
-
-	return &pb.OriginResponse{Purls: provResponse.Purls, Status: &statusResp}, nil
+	return &pb.OriginResponse{Purls: provResponse.Purls, Status: statusResp}, nil
 }
 
 // closeDbConnection closes the specified database connection

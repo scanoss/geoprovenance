@@ -5,4 +5,5 @@ type QuerySummary struct {
 	PurlsWOInfo        []string
 	PurlsNotFound      []string
 	PurlsTooMuchData   []string
+	TotalPurls         int
 }

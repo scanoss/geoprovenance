@@ -19,6 +19,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	se "scanoss.com/provenance/pkg/errors"
 
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
@@ -28,18 +29,26 @@ import (
 )
 
 // convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
-func convertProvenanceInput(s *zap.SugaredLogger, request *common.PurlRequest) (dtos.ProvenanceInput, error) {
-	data, err := json.Marshal(request)
-	if err != nil {
-		s.Errorf("Problem marshalling Provenance request input: %v", err)
-		return dtos.ProvenanceInput{}, errors.New("problem marshalling Provenance input")
+func convertProvenanceInput(request *common.PurlRequest) ([]dtos.ComponentDTO, error) {
+	if (request.Purls == nil) || (len(request.Purls) == 0) {
+		return []dtos.ComponentDTO{}, se.NewBadRequestError("No components supplied. At least one component should be supplied", nil)
 	}
-	dtoRequest, err := dtos.ParseProvenanceInput(s, data)
-	if err != nil {
-		s.Errorf("Problem parsing Provenance request input: %v", err)
-		return dtos.ProvenanceInput{}, errors.New("problem parsing Provenance input")
+	var componentDTOS = []dtos.ComponentDTO{}
+	var emptyPurl []string
+	for _, c := range request.Purls {
+		if c.Purl == "" {
+			emptyPurl = append(emptyPurl, c.Purl)
+			continue
+		}
+		componentDTOS = append(componentDTOS, dtos.ComponentDTO{
+			Purl:        c.Purl,
+			Requirement: c.Requirement,
+		})
 	}
-	return dtoRequest, nil
+	if len(emptyPurl) > len(componentDTOS) {
+		return []dtos.ComponentDTO{}, se.NewBadRequestError("Empty purl supplied. At least one component should be supplied", nil)
+	}
+	return componentDTOS, nil
 }
 
 // convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct

@@ -18,7 +18,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"math"
 	"strings"
 
@@ -42,27 +41,24 @@ func NewOrigin(ctx context.Context, conn *sqlx.Conn) *OriginUseCase {
 // GetOrigin takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
 //
 //goland:noinspection ALL
-func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutput, models.QuerySummary, error) {
+func (p OriginUseCase) GetOrigin(components []dtos.ComponentDTO) (dtos.OriginOutput, models.QuerySummary, error) {
 
-	if len(request.Purls) == 0 {
-		p.s.Info("Empty List of Purls supplied")
-		return dtos.OriginOutput{}, models.QuerySummary{}, errors.New("empty list of purls")
-	}
 	summary := models.QuerySummary{}
+	summary.TotalPurls = len(components)
 	var purls []string
 	resMaps := make(map[string][]models.LocationDistribution)
 
 	//Prepare purls to query
-	for _, purl := range request.Purls {
+	for _, component := range components {
 
-		purlName, err := utils.PurlNameFromString(purl.Purl) // Make sure we just have the bare minimum for a Purl Name
+		purlName, err := utils.PurlNameFromString(component.Purl) // Make sure we just have the bare minimum for a Purl Name
 		if err == nil {
 			// to avoid SQL Injection
 			purlName = strings.ReplaceAll(purlName, "'", "")
 			purlName = strings.ReplaceAll(purlName, "\"", "")
 			purls = append(purls, purlName)
 		} else {
-			summary.PurlsFailedToParse = append(summary.PurlsFailedToParse, purl.Purl)
+			summary.PurlsFailedToParse = append(summary.PurlsFailedToParse, component.Purl)
 		}
 	}
 
@@ -95,14 +91,14 @@ func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutpu
 	}
 
 	//Create the response
-	for _, purl := range request.Purls {
-		purlName, err := utils.PurlNameFromString(purl.Purl)
+	for _, component := range components {
+		purlName, err := utils.PurlNameFromString(component.Purl)
 		if err != nil {
 			continue
 		}
 		origins := resMaps[purlName]
 		var origOutItem dtos.OriginOutputItem
-		origOutItem.Purl = purl.Purl
+		origOutItem.Purl = component.Purl
 		for _, origin := range origins {
 			origOutItem.Countries = append(origOutItem.Countries, dtos.CountryInfo{Name: origin.CountryName /*, Developers: origin.UserCount*/, Percentage: origin.ContributorPercentage})
 		}
@@ -111,11 +107,11 @@ func (p OriginUseCase) GetOrigin(request dtos.ProvenanceInput) (dtos.OriginOutpu
 	}
 
 	// Check if results should have a "too many contributors Warning"
-	for _, purl := range request.Purls {
-		purlName, err := utils.PurlNameFromString(purl.Purl)
+	for _, component := range components {
+		purlName, err := utils.PurlNameFromString(component.Purl)
 		if err == nil {
 			if existPurl(tooMany, purlName) {
-				summary.PurlsTooMuchData = append(summary.PurlsTooMuchData, purl.Purl)
+				summary.PurlsTooMuchData = append(summary.PurlsTooMuchData, component.Purl)
 			}
 		}
 	}

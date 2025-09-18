@@ -18,7 +18,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 
@@ -61,24 +60,21 @@ func NewProvenance(ctx context.Context, conn *sqlx.Conn, s *zap.SugaredLogger) *
 }
 
 // GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
-func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.ProvenanceOutput, models.QuerySummary, error) {
+func (p ProvenanceUseCase) GetProvenance(components []dtos.ComponentDTO) (dtos.ProvenanceOutput, models.QuerySummary, error) {
 
-	if len(request.Purls) == 0 {
-		p.s.Info("Empty List of Purls supplied")
-		return dtos.ProvenanceOutput{}, models.QuerySummary{}, errors.New("empty list of purls")
-	}
 	summary := models.QuerySummary{}
+	summary.TotalPurls = len(components)
 	var purls []string
 	//Prepare purls to query
-	for _, purl := range request.Purls {
-		purlName, err := utils.PurlNameFromString(purl.Purl) // Make sure we just have the bare minimum for a Purl Name
+	for _, component := range components {
+		purlName, err := utils.PurlNameFromString(component.Purl) // Make sure we just have the bare minimum for a Purl Name
 		if err == nil {
 			// to avoid SQL Injection
 			purlName = strings.ReplaceAll(purlName, "'", "")
 			purlName = strings.ReplaceAll(purlName, "\"", "")
 			purls = append(purls, purlName)
 		} else {
-			summary.PurlsFailedToParse = append(summary.PurlsFailedToParse, purl.Purl)
+			summary.PurlsFailedToParse = append(summary.PurlsFailedToParse, component.Purl)
 		}
 	}
 	prov := models.NewProvenanceModel(p.ctx, p.conn)
@@ -101,15 +97,15 @@ func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.Pro
 		vendorsMap[v.PurlName] = append(vendorsMap[v.PurlName], v)
 	}
 
-	for _, purl := range request.Purls {
+	for _, component := range components {
 
-		purlName, err := utils.PurlNameFromString(purl.Purl) // Make sure we just have the bare minimum for a Purl Name
+		purlName, err := utils.PurlNameFromString(component.Purl) // Make sure we just have the bare minimum for a Purl Name
 		if err == nil {
-			if !(len(vendorsMap[purlName]) > 0) && !existPurl(summary.PurlsFailedToParse, purl.Purl) {
-				summary.PurlsWOInfo = append(summary.PurlsWOInfo, purl.Purl)
+			if !(len(vendorsMap[purlName]) > 0) && !existPurl(summary.PurlsFailedToParse, component.Purl) {
+				summary.PurlsWOInfo = append(summary.PurlsWOInfo, component.Purl)
 			}
 			if existPurl(tooMany, purlName) {
-				summary.PurlsTooMuchData = append(summary.PurlsTooMuchData, purl.Purl)
+				summary.PurlsTooMuchData = append(summary.PurlsTooMuchData, component.Purl)
 			}
 		}
 	}
@@ -118,8 +114,8 @@ func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.Pro
 
 	//Create the response
 
-	for _, purl := range request.Purls {
-		purlName, err := utils.PurlNameFromString(purl.Purl)
+	for _, component := range components {
+		purlName, err := utils.PurlNameFromString(component.Purl)
 		if err != nil {
 			continue
 		}
@@ -127,7 +123,7 @@ func (p ProvenanceUseCase) GetProvenance(request dtos.ProvenanceInput) (dtos.Pro
 
 		var provOutItem dtos.ProvenanceOutputItem
 
-		provOutItem.Purl = purl.Purl
+		provOutItem.Purl = component.Purl
 		for _, vendor := range listOfVendors {
 			if vendor.DeclaredLocation != "" {
 				provOutItem.DeclaredLocations = append(provOutItem.DeclaredLocations, dtos.DeclaredProvenanceItem{Type: vendor.Type, Location: vendor.DeclaredLocation})
