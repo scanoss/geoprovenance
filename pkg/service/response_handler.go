@@ -85,6 +85,18 @@ func determineStatusAndHTTPCode(s *zap.SugaredLogger, summary models.QuerySummar
 			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
 		}, http.StatusOK, nil
 
+	case totalWOInfo > 0:
+		return common.StatusResponse{
+			Message: responseMessage,
+			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
+		}, http.StatusOK, nil
+
+	case totalNotFound > 0 && totalNotFound < totalPurls:
+		return common.StatusResponse{
+			Message: responseMessage,
+			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
+		}, http.StatusOK, nil
+
 	default:
 		// Mixed results: some succeeded, some failed
 		return common.StatusResponse{

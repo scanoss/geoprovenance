@@ -155,12 +155,16 @@ func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.Componen
 
 // toComponentContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
 func toComponentContributorResponse(output dtos.ProvenanceOutput) (*pb.ComponentContributorResponse, error) {
-	response := pb.ComponentContributorResponse{}
+	response := pb.ComponentContributorResponse{
+		ComponentLocations: &pb.ComponentLocationInfo{},
+	}
 	componentsContributors, err := toComponentsContributorResponse(output)
 	if err != nil {
-		return &response, se.NewInternalError("Error provenance data to response", err)
+		return &response, se.NewInternalError("Error converting provenance data to response", err)
 	}
-	response.ComponentLocations = componentsContributors.ComponentsLocations[0]
+	if len(componentsContributors.ComponentsLocations) > 0 {
+		response.ComponentLocations = componentsContributors.ComponentsLocations[0]
+	}
 	return &response, nil
 }
 
@@ -194,6 +198,8 @@ func toComponentOriginResponse(output dtos.OriginOutput) (*pb.ComponentOriginRes
 	if err != nil {
 		return &response, se.NewInternalError("Error provenance data to response", err)
 	}
-	response.ComponentLocations = componentsOriginsResponse.ComponentsLocations[0]
+	if len(componentsOriginsResponse.ComponentsLocations) > 0 {
+		response.ComponentLocations = componentsOriginsResponse.ComponentsLocations[0]
+	}
 	return &response, nil
 }

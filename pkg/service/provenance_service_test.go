@@ -260,7 +260,344 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 		}
 
 	}
+}
 
+func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
+	ctx := context.Background()
+	err := zlog.NewSugaredDevLogger()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
+	}
+	defer zlog.SyncZap()
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer models.CloseDB(db)
+	ctx = ctxzap.ToContext(ctx, zlog.L)
+
+	err = models.LoadTestSqlData(db, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	myConfig, err := myconfig.NewServerConfig(nil)
+	if err != nil {
+		t.Fatalf("failed to load Config: %v", err)
+	}
+
+	s := NewProvenanceServer(db, myConfig)
+
+	tests := []struct {
+		name             string
+		request          common.ComponentsRequest
+		expectedResponse pb.ComponentsContributorResponse
+		expectError      bool
+	}{
+		{
+			name: "Should_Return_OneResult",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/engine",
+					},
+					{
+						Purl: "pkg:github/torvalds/uemacs",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_failed_status",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/engines",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_success_status",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/engine",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, errReq := s.GetCountryContributorsByComponents(ctx, &tt.request)
+			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
+				t.Errorf("service.GetCountryContributorsByComponents() = %v, want %v", r, tt.expectedResponse)
+			}
+			if r.Status.Status != tt.expectedResponse.Status.Status {
+				t.Errorf("service.GetCountryContributorsByComponents() = %v, want %v", r, tt.expectedResponse)
+			}
+		})
+	}
+}
+
+func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
+	ctx := context.Background()
+	err := zlog.NewSugaredDevLogger()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
+	}
+	defer zlog.SyncZap()
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer models.CloseDB(db)
+	ctx = ctxzap.ToContext(ctx, zlog.L)
+
+	err = models.LoadTestSqlData(db, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	myConfig, err := myconfig.NewServerConfig(nil)
+	if err != nil {
+		t.Fatalf("failed to load Config: %v", err)
+	}
+
+	s := NewProvenanceServer(db, myConfig)
+
+	tests := []struct {
+		name             string
+		request          common.ComponentRequest
+		expectedResponse pb.ComponentContributorResponse
+		expectError      bool
+	}{
+		{
+			name: "Should_Return_status-failed",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/torvalds/uemacs",
+			},
+			expectedResponse: pb.ComponentContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_failed_status",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/scanoss/engines",
+			},
+			expectedResponse: pb.ComponentContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_success_status",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/scanoss/engine",
+			},
+			expectedResponse: pb.ComponentContributorResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, errReq := s.GetCountryContributorsByComponent(ctx, &tt.request)
+			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
+				t.Errorf("service.GetCountryContributorsByComponent() = %v, want %v", r, tt.expectedResponse)
+			}
+			if r.Status.Status != tt.expectedResponse.Status.Status {
+				t.Errorf("service.GetCountryContributorsByComponent() = %v, want %v", r, tt.expectedResponse)
+			}
+		})
+	}
+}
+
+func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
+	ctx := context.Background()
+	err := zlog.NewSugaredDevLogger()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
+	}
+	defer zlog.SyncZap()
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer models.CloseDB(db)
+	ctx = ctxzap.ToContext(ctx, zlog.L)
+
+	err = models.LoadTestSqlData(db, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	myConfig, err := myconfig.NewServerConfig(nil)
+	if err != nil {
+		t.Fatalf("failed to load Config: %v", err)
+	}
+
+	s := NewProvenanceServer(db, myConfig)
+
+	tests := []struct {
+		name             string
+		request          common.ComponentsRequest
+		expectedResponse pb.ComponentsOriginResponse
+		expectError      bool
+	}{
+		{
+			name: "Should_Return_OneResult",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/engine",
+					},
+					{
+						Purl: "pkg:github/torvalds/uemacs",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_failed_status",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/unexistent",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_success_status",
+			request: common.ComponentsRequest{
+				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/engine",
+					},
+				},
+			},
+			expectedResponse: pb.ComponentsOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, errReq := s.GetOriginByComponents(ctx, &tt.request)
+			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
+				t.Errorf("service.GetOriginByComponents() = %v, want %v", r, tt.expectedResponse)
+			}
+			if r.Status.Status != tt.expectedResponse.Status.Status {
+				t.Errorf("service.GetOriginByComponents() = %v, want %v", r, tt.expectedResponse)
+			}
+		})
+	}
+}
+
+func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
+	ctx := context.Background()
+	err := zlog.NewSugaredDevLogger()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
+	}
+	defer zlog.SyncZap()
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer models.CloseDB(db)
+	ctx = ctxzap.ToContext(ctx, zlog.L)
+
+	err = models.LoadTestSqlData(db, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	myConfig, err := myconfig.NewServerConfig(nil)
+	if err != nil {
+		t.Fatalf("failed to load Config: %v", err)
+	}
+
+	s := NewProvenanceServer(db, myConfig)
+
+	tests := []struct {
+		name             string
+		request          common.ComponentRequest
+		expectedResponse pb.ComponentOriginResponse
+		expectError      bool
+	}{
+		{
+			name: "Should_Return_status-failed",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/torvalds/uemacs",
+			},
+			expectedResponse: pb.ComponentOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_failed_status",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/scanoss/engines",
+			},
+			expectedResponse: pb.ComponentOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+			},
+			expectError: false,
+		},
+		{
+			name: "Should_return_success_status",
+			request: common.ComponentRequest{
+				Purl: "pkg:github/scanoss/engine",
+			},
+			expectedResponse: pb.ComponentOriginResponse{
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, errReq := s.GetOriginByComponent(ctx, &tt.request)
+			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
+				t.Errorf("service.GetOriginByComponent() = %v, want %v", r, tt.expectedResponse)
+			}
+			if r.Status.Status != tt.expectedResponse.Status.Status {
+				t.Errorf("service.GetOriginByComponent() = %v, want %v", r, tt.expectedResponse)
+			}
+		})
+	}
 }
 
 func TestProvenanceServer_GetOrigin(t *testing.T) {
@@ -334,17 +671,12 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:    "Should_ReturnSucceed",
+			name:    "Should_Failed_Not_Found",
 			request: `{"Purls":[ {"Purl":"pkg:github/scanoss/engines"} ]}`,
 			expectedResponse: dtos.OriginOutput{
-				Provenance: []dtos.OriginOutputItem{
-					{
-						Purl:      "pkg:github/scanoss/engine",
-						Countries: nil,
-					},
-				},
+				Provenance: []dtos.OriginOutputItem{},
 			},
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:    "Should_ReturnSucceed",

@@ -96,9 +96,15 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		origins := resMaps[purlName]
 		var origOutItem dtos.OriginOutputItem
 		origOutItem.Purl = component.Purl
+		if len(origins) == 0 {
+			summary.PurlsWOInfo = append(summary.PurlsWOInfo, component.Purl)
+			retV.Provenance = append(retV.Provenance, origOutItem)
+			continue
+		}
 		for _, origin := range origins {
 			origOutItem.Countries = append(origOutItem.Countries, dtos.CountryInfo{Name: origin.CountryName /*, Developers: origin.UserCount*/, Percentage: origin.ContributorPercentage})
 		}
+
 		retV.Provenance = append(retV.Provenance, origOutItem)
 
 	}
