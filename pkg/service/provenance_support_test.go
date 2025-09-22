@@ -55,9 +55,14 @@ func TestInputConvert(t *testing.T) {
 	defer zlog.SyncZap()
 	ctx := context.Background()
 	ctx = ctxzap.ToContext(ctx, zlog.L)
-	s := ctxzap.Extract(ctx).Sugar()
-	var provIn = &common.PurlRequest{}
-	input, err := convertProvenanceInput(s, provIn)
+	var provIn = &common.PurlRequest{
+		Purls: []*common.PurlRequest_Purls{
+			{
+				Purl: "pkg:github/scanoss/scanoss.js",
+			},
+		},
+	}
+	input, err := convertProvenanceInput(provIn)
 	if err != nil {
 		t.Errorf("TestInputConvert failed: %v", err)
 	}

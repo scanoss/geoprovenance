@@ -52,30 +52,24 @@ func TestProvenanceUseCase(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer models.CloseConn(conn)
-	err = models.LoadTestSqlData(db, ctx, conn)
+	err = models.LoadTestSqlData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
-	var provRequest = `{
-		      "purls": [
-		        {
-		          "purl": "pkg:github/scanoss/engine",
-		          "requirement": "5.2.4"
-		        }
-		      ]
-		  	}`
+	componentDTOS := []dtos.ComponentDTO{
+		{
+			Purl:        "pkg:github/scanoss/engine",
+			Requirement: "5.2.4",
+		},
+	}
 	myConfig, err := myconfig.NewServerConfig(nil)
 	_ = myConfig
 	if err != nil {
 		t.Fatalf("failed to load Config: %v", err)
 	}
-	provUc := NewProvenance(ctx, conn, s)
+	provUc := NewProvenance(db)
 
-	requestDto, err := dtos.ParseProvenanceInput(s, []byte(provRequest))
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when parsing input json", err)
-	}
-	countries, notFound, err := provUc.GetProvenance(requestDto)
+	countries, notFound, err := provUc.GetProvenance(ctx, s, componentDTOS)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
@@ -85,35 +79,20 @@ func TestProvenanceUseCase(t *testing.T) {
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v, %+v\n", countries, notFound)
-	var provBadRequest = `{
-	   		    "purls": [
-	   		        {
-	   		          "purl": "pkg:npm/"
-	   		        }
-	   		  ]
-	   		}
-	   		`
-
-	requestDto, err = dtos.ParseProvenanceInput(s, []byte(provBadRequest))
-
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when parsing input json", err)
+	componentDTOS = []dtos.ComponentDTO{
+		{
+			Purl: "pkg:npm/",
+		},
 	}
-
-	countries, _, err = provUc.GetProvenance(requestDto)
+	countries, _, err = provUc.GetProvenance(ctx, s, componentDTOS)
 
 	if err == nil && len(countries.Provenance) > 0 {
 		t.Fatalf("did not get an expected error: %v", countries)
 	}
 
-	emptyReq, err := dtos.ParseProvenanceInput(s, []byte(`{ "purls": [] }`))
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when parsing input json", err)
-	}
-	fmt.Printf("requestDto: %+v\n", emptyReq)
-	countries, _, err = provUc.GetProvenance(emptyReq)
+	componentDTOS = []dtos.ComponentDTO{}
+	countries, _, err = provUc.GetProvenance(ctx, s, componentDTOS)
 	if err == nil {
-		t.Fatalf("did not get an expected error: %v", countries)
+		t.Fatalf("Not found error was expected")
 	}
-
 }

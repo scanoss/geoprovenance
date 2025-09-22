@@ -21,13 +21,13 @@ package models
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 
 	"github.com/jmoiron/sqlx"
 )
 
 type CountriesModel struct {
-	ctx  context.Context
-	conn *sqlx.Conn
+	db *sqlx.DB
 }
 type countryRow struct {
 	Id      int    `db:"id"`
@@ -35,21 +35,21 @@ type countryRow struct {
 }
 
 // NewCountryMapModel creates a new instance of the Mine Model
-func NewCountryMapModel(ctx context.Context, conn *sqlx.Conn) *CountriesModel {
-	return &CountriesModel{ctx: ctx, conn: conn}
+func NewCountryMapModel(db *sqlx.DB) *CountriesModel {
+	return &CountriesModel{db: db}
 }
 
 var countryMap map[int]string
 
 // GetCountryById Gets a list of the Purl Type IDs associated with the given Purl Type (string)
-func (m *CountriesModel) GetCountryById(id int) (string, error) {
+func (m *CountriesModel) GetCountryById(ctx context.Context, s *zap.SugaredLogger, id int) (string, error) {
 
 	if countryMap == nil {
 
 		countryMap = make(map[int]string)
 
 		var countries []countryRow
-		err := m.conn.SelectContext(m.ctx, &countries, "SELECT id,country_name FROM countries")
+		err := m.db.SelectContext(ctx, &countries, "SELECT id,country_name FROM countries")
 		if err != nil {
 			//zlog.S.Errorf("Error: Failed to query country table for %v: %v", purlType, err)
 			return "", fmt.Errorf("failed to query the mines table: %v", err)
@@ -62,6 +62,7 @@ func (m *CountriesModel) GetCountryById(id int) (string, error) {
 	}
 	c, exist := countryMap[id]
 	if !exist {
+		s.Error("coutry not found")
 		return "N/A", fmt.Errorf("coutry not found")
 	} else {
 		return c, nil

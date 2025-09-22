@@ -28,9 +28,9 @@ import (
 )
 
 type ProvenanceModel struct {
-	ctx  context.Context
-	s    *zap.SugaredLogger
-	conn *sqlx.Conn
+	ctx context.Context
+	s   *zap.SugaredLogger
+	db  *sqlx.DB
 }
 
 type Provenance struct {
@@ -52,8 +52,8 @@ type LocationDistribution struct {
 }
 
 // NewProvenanceModel creates a new instance of a provenance Model
-func NewProvenanceModel(ctx context.Context, conn *sqlx.Conn) *ProvenanceModel {
-	return &ProvenanceModel{ctx: ctx, conn: conn}
+func NewProvenanceModel(db *sqlx.DB) *ProvenanceModel {
+	return &ProvenanceModel{db: db}
 }
 
 // ProcessCuratedVendors assigns a list of country name to given set of id's of a set of provenance records
@@ -78,7 +78,7 @@ func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string
 }
 
 // GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames
-func (m *ProvenanceModel) GetProvenanceByPurlNames(purlNames []string) ([]Provenance, error) {
+func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]Provenance, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
 	list = "('" + list + "')"
@@ -108,16 +108,17 @@ func (m *ProvenanceModel) GetProvenanceByPurlNames(purlNames []string) ([]Proven
 		      AND vd.type IS NOT NULL
 		      AND vd.mine_id = 5
 		      AND vl.declared_location IS NOT NULL;`
-	err := m.conn.SelectContext(m.ctx, &allSources, query)
+
+	err := m.db.SelectContext(ctx, &allSources, query)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 	return allSources, nil
 }
 
 // GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames
-func (m *ProvenanceModel) GetTooManyContributors(purlNames []string) ([]string, error) {
+func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]string, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
 	list = "('" + list + "')"
@@ -127,16 +128,16 @@ func (m *ProvenanceModel) GetTooManyContributors(purlNames []string) ([]string, 
 			from too_many_contributors tmc 
 			where tmc.purl_name in ` + list + `
 		      AND tmc.mine_id = 5;`
-	err := m.conn.SelectContext(m.ctx, &purls, query)
+	err := m.db.SelectContext(ctx, &purls, query)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 
 	return purls, nil
 }
 
-func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(purlName string) ([]Origin, error) {
+func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(ctx context.Context, s *zap.SugaredLogger, purlName string) ([]Origin, error) {
 
 	var allSources []Origin
 	query := `
@@ -158,9 +159,9 @@ ORDER BY
   vendor_count DESC;
 
 `
-	err := m.conn.SelectContext(m.ctx, &allSources, query, purlName)
+	err := m.db.SelectContext(ctx, &allSources, query, purlName)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlName, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlName, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 	return allSources, nil

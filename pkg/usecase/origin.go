@@ -29,19 +29,17 @@ import (
 )
 
 type OriginUseCase struct {
-	ctx  context.Context
-	s    *zap.SugaredLogger
-	conn *sqlx.Conn
+	provenanceModel *models.ProvenanceModel
 }
 
-func NewOrigin(ctx context.Context, conn *sqlx.Conn) *OriginUseCase {
-	return &OriginUseCase{ctx: ctx, conn: conn}
+func NewOrigin(db *sqlx.DB) *OriginUseCase {
+	return &OriginUseCase{provenanceModel: models.NewProvenanceModel(db)}
 }
 
 // GetOrigin takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
 //
 //goland:noinspection ALL
-func (p OriginUseCase) GetOrigin(components []dtos.ComponentDTO) (dtos.OriginOutput, models.QuerySummary, error) {
+func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, components []dtos.ComponentDTO) (dtos.OriginOutput, models.QuerySummary, error) {
 
 	summary := models.QuerySummary{}
 	summary.TotalPurls = len(components)
@@ -62,12 +60,11 @@ func (p OriginUseCase) GetOrigin(components []dtos.ComponentDTO) (dtos.OriginOut
 		}
 	}
 
-	prov := models.NewProvenanceModel(p.ctx, p.conn)
 	// Query Origin for each purl and count amount of users per each
 	mapTotal := make(map[string]int16)
-	for _, p := range purls {
+	for _, purl := range purls {
 		mapOrigins := make(map[string]int16)
-		tz, _ := prov.GetTimeZoneOriginByPurlName(p)
+		tz, _ := p.provenanceModel.GetTimeZoneOriginByPurlName(ctx, s, purl)
 		for _, v := range tz {
 			if count, exist := mapOrigins[v.CountryName]; !exist {
 				mapOrigins[v.CountryName] = int16(v.ContributorCount)
@@ -75,17 +72,17 @@ func (p OriginUseCase) GetOrigin(components []dtos.ComponentDTO) (dtos.OriginOut
 			} else {
 				mapOrigins[v.CountryName] = count + int16(v.ContributorCount)
 			}
-			mapTotal[p] += int16(v.ContributorCount)
+			mapTotal[purl] += int16(v.ContributorCount)
 		}
 
 		for k, v := range mapOrigins {
-			var percentage = float32(v*100) / float32(mapTotal[p])
-			resMaps[p] = append(resMaps[p], models.LocationDistribution{CountryName: k, ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100)})
+			var percentage = float32(v*100) / float32(mapTotal[purl])
+			resMaps[purl] = append(resMaps[purl], models.LocationDistribution{CountryName: k, ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100)})
 		}
 	}
 
 	retV := dtos.OriginOutput{}
-	tooMany, err2many := prov.GetTooManyContributors(purls)
+	tooMany, err2many := p.provenanceModel.GetTooManyContributors(ctx, s, purls)
 	if err2many != nil {
 		return dtos.OriginOutput{}, models.QuerySummary{}, err2many
 	}

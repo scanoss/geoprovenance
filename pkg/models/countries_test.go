@@ -34,6 +34,7 @@ func TestCountryLookUp(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
 	}
 	defer zlog.SyncZap()
+	s := zlog.L.Sugar()
 	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -44,11 +45,11 @@ func TestCountryLookUp(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer CloseConn(conn)
-	err = loadTestSqlDataFiles(db, ctx, conn, []string{"../models/tests/countries.sql"})
+	err = LoadTestSqlData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to load SQL test data: %v", err)
 	}
-	countryModel := NewCountryMapModel(ctx, conn)
+	countryModel := NewCountryMapModel(db)
 	countriesToPick := []string{"Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria"}
 
 	randomIndex := rand.IntN(len(countriesToPick))
@@ -58,7 +59,7 @@ func TestCountryLookUp(t *testing.T) {
 
 	var countryName = randomElement
 	fmt.Printf("Searching for Country: %v\n", countryName)
-	gotName, err := countryModel.GetCountryById(dbPK)
+	gotName, err := countryModel.GetCountryById(ctx, s, dbPK)
 
 	if err != nil {
 		t.Errorf("Countries model error = %v", err)

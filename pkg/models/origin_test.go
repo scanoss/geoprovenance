@@ -34,16 +34,10 @@ func TestContributorOrigin(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	conn, err := db.Connx(ctx)
-
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when loading test data", err)
-	}
-
 	//CloseConn(conn)
-	cProvModel := NewProvenanceModel(ctx, conn)
+	cProvModel := NewProvenanceModel(db)
 	purlsNames := []string{"torvalds/uemacs", "scanoss/engine"}
-	list, errq := cProvModel.GetTimeZoneOriginByPurlName(purlsNames[1])
+	list, errq := cProvModel.GetTimeZoneOriginByPurlName(ctx, s, purlsNames[1])
 	if errq != nil {
 		t.Logf("unexpected error on model request  %+v\n", errq)
 	} else {
