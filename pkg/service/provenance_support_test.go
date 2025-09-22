@@ -53,9 +53,7 @@ func TestInputConvert(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
 	}
 	defer zlog.SyncZap()
-	ctx := context.Background()
-	ctx = ctxzap.ToContext(ctx, zlog.L)
-	var provIn = &common.PurlRequest{
+	var provIn = &common.PurlRequest{ //nolint:staticcheck
 		Purls: []*common.PurlRequest_Purls{
 			{
 				Purl: "pkg:github/scanoss/scanoss.js",
@@ -72,14 +70,14 @@ func TestInputConvert(t *testing.T) {
 func Test_convertProvenanceInput(t *testing.T) {
 	tests := []struct {
 		name        string
-		request     *common.PurlRequest
+		request     *common.PurlRequest //nolint:staticcheck
 		wantLen     int
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "Valid request with single purl",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{
 					{Purl: "pkg:github/scanoss/engine", Requirement: "latest"},
 				},
@@ -89,7 +87,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Valid request with multiple purls",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{
 					{Purl: "pkg:github/scanoss/engine"},
 					{Purl: "pkg:npm/lodash@4.17.21"},
@@ -100,7 +98,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Empty purls slice",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{},
 			},
 			expectError: true,
@@ -108,7 +106,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Nil purls slice",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: nil,
 			},
 			expectError: true,
@@ -116,7 +114,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Empty purl string",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{
 					{Purl: ""},
 				},
@@ -126,7 +124,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Mix of valid and empty purls - valid wins",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{
 					{Purl: "pkg:github/scanoss/engine"},
 					{Purl: ""},
@@ -138,7 +136,7 @@ func Test_convertProvenanceInput(t *testing.T) {
 		},
 		{
 			name: "Mix of valid and empty purls - empty wins",
-			request: &common.PurlRequest{
+			request: &common.PurlRequest{ //nolint:staticcheck
 				Purls: []*common.PurlRequest_Purls{
 					{Purl: ""},
 					{Purl: ""},

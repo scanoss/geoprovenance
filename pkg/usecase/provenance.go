@@ -30,7 +30,6 @@ import (
 )
 
 type ProvenanceUseCase struct {
-	s               *zap.SugaredLogger
 	db              *sqlx.DB
 	provenanceModel *models.ProvenanceModel
 	countryMapModel *models.CountriesModel
@@ -67,7 +66,7 @@ func NewProvenance(db *sqlx.DB) *ProvenanceUseCase {
 
 // GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
 func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogger, components []dtos.ComponentDTO) (dtos.ProvenanceOutput, models.QuerySummary, error) {
-	
+
 	summary := models.QuerySummary{}
 	summary.TotalPurls = len(components)
 	var purls []string

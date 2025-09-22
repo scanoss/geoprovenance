@@ -29,7 +29,7 @@ import (
 )
 
 // convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
-func convertProvenanceInput(request *common.PurlRequest) ([]dtos.ComponentDTO, error) {
+func convertProvenanceInput(request *common.PurlRequest) ([]dtos.ComponentDTO, error) { //nolint:staticcheck
 	if (request.Purls == nil) || (len(request.Purls) == 0) {
 		return []dtos.ComponentDTO{}, se.NewBadRequestError("No components supplied. At least one component should be supplied", nil)
 	}
@@ -52,35 +52,35 @@ func convertProvenanceInput(request *common.PurlRequest) ([]dtos.ComponentDTO, e
 }
 
 // convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
-func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput) (*pb.ContributorResponse, error) {
+func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput) (*pb.ContributorResponse, error) { //nolint:staticcheck
 	data, err := json.Marshal(output)
 	if err != nil {
 		s.Errorf("Problem marshalling Provenance request output: %v", err)
-		return &pb.ContributorResponse{}, errors.New("problem marshalling Provenance output")
+		return &pb.ContributorResponse{}, errors.New("problem marshalling Provenance output") //nolint:staticcheck
 	}
 	//zlog.S.Debugf("Parsed data: %v", string(data))
-	var depResp pb.ContributorResponse
+	var depResp pb.ContributorResponse //nolint:staticcheck
 	err = json.Unmarshal(data, &depResp)
 	if err != nil {
 		s.Errorf("Problem unmarshalling Provenance request output: %v", err)
-		return &pb.ContributorResponse{}, errors.New("problem unmarshalling Provenance output")
+		return &pb.ContributorResponse{}, errors.New("problem unmarshalling Provenance output") //nolint:staticcheck
 	}
 	return &depResp, nil
 }
 
 // convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
-func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.OriginResponse, error) {
+func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.OriginResponse, error) { //nolint:staticcheck
 	data, err := json.Marshal(output)
 	if err != nil {
 		s.Errorf("Problem marshalling Provenance request output: %v", err)
-		return &pb.OriginResponse{}, errors.New("problem marshalling Provenance output")
+		return &pb.OriginResponse{}, errors.New("problem marshalling Provenance output") //nolint:staticcheck
 	}
 	//zlog.S.Debugf("Parsed data: %v", string(data))
-	var depResp pb.OriginResponse
+	var depResp pb.OriginResponse //nolint:staticcheck
 	err = json.Unmarshal(data, &depResp)
 	if err != nil {
 		s.Errorf("Problem unmarshalling Provenance request output: %v", err)
-		return &pb.OriginResponse{}, errors.New("problem unmarshalling Provenance output")
+		return &pb.OriginResponse{}, errors.New("problem unmarshalling Provenance output") //nolint:staticcheck
 	}
 	return &depResp, nil
 }

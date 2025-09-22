@@ -28,9 +28,7 @@ import (
 )
 
 type ProvenanceModel struct {
-	ctx context.Context
-	s   *zap.SugaredLogger
-	db  *sqlx.DB
+	db *sqlx.DB
 }
 
 type Provenance struct {

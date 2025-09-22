@@ -172,7 +172,7 @@ func executeRequestPipeline[T any, R any](
 // 5. Construct and return typed response
 func handleLegacyRequest[T any](
 	ctx context.Context,
-	req *common.PurlRequest,
+	req *common.PurlRequest, //nolint:staticcheck
 	useCaseHandler UseCaseHandler,
 	responseBuilder ResponseBuilder[T],
 ) T {
@@ -277,8 +277,8 @@ func (p provenanceServer) Echo(ctx context.Context, request *common.EchoRequest)
 // 2. Execute provenance use case to retrieve contributor data
 // 3. Convert output to protobuf format
 // 4. Build appropriate status response based on processing results
-func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) {
-	result := handleLegacyRequest[*pb.ContributorResponse](ctx, request,
+func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) { //nolint:staticcheck
+	result := handleLegacyRequest[*pb.ContributorResponse](ctx, request, //nolint:staticcheck
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
 
@@ -290,9 +290,9 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 			return response, summary, err
 		},
 		// Response mapping - type-safe and clear
-		func(data interface{}, status *common.StatusResponse) *pb.ContributorResponse {
-			resp := &pb.ContributorResponse{Status: status}
-			if provData, ok := data.(*pb.ContributorResponse); ok && provData != nil {
+		func(data interface{}, status *common.StatusResponse) *pb.ContributorResponse { //nolint:staticcheck
+			resp := &pb.ContributorResponse{Status: status} //nolint:staticcheck
+			if provData, ok := data.(*pb.ContributorResponse); ok && provData != nil { //nolint:staticcheck
 				resp.Purls = provData.Purls
 			}
 			return resp
@@ -353,8 +353,8 @@ func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context,
 // GetComponentOrigin retrieves origin information for the specified components.
 // This endpoint processes PURL (Package URL) requests to identify and return information
 // about the geographical and organizational origins of the requested software components.
-func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) {
-	result := handleLegacyRequest[*pb.OriginResponse](ctx, request,
+func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) { //nolint:staticcheck
+	result := handleLegacyRequest[*pb.OriginResponse](ctx, request, //nolint:staticcheck
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
 			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
@@ -365,9 +365,9 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 			return response, summary, err
 		},
 		// Response mapping - type-safe and clear
-		func(data interface{}, status *common.StatusResponse) *pb.OriginResponse {
-			resp := &pb.OriginResponse{Status: status}
-			if provData, ok := data.(*pb.OriginResponse); ok && provData != nil {
+		func(data interface{}, status *common.StatusResponse) *pb.OriginResponse { //nolint:staticcheck
+			resp := &pb.OriginResponse{Status: status} //nolint:staticcheck
+			if provData, ok := data.(*pb.OriginResponse); ok && provData != nil { //nolint:staticcheck
 				resp.Purls = provData.Purls
 			}
 			return resp

@@ -180,12 +180,12 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var request common.PurlRequest
+			var request common.PurlRequest //nolint:staticcheck
 			err := json.Unmarshal([]byte(tt.request), &request)
 			if err != nil {
 				t.Errorf("an error '%s' was not expected when parsing input json", err)
 			}
-			r, errReq := s.GetComponentContributors(ctx, &request)
+			r, errReq := s.GetComponentContributors(ctx, &request) //nolint:staticcheck
 			if errReq != nil && !tt.expectError {
 				t.Logf("unexpected error on request %+v", errReq)
 			}
@@ -227,9 +227,9 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 		})
 	}
 
-	request := common.PurlRequest{Purls: []*common.PurlRequest_Purls{{Purl: "pkg:github/scanoss/engine"}, {Purl: "pkg:github/torvalds/uemacs"}}}
+	request := common.PurlRequest{Purls: []*common.PurlRequest_Purls{{Purl: "pkg:github/scanoss/engine"}, {Purl: "pkg:github/torvalds/uemacs"}}} //nolint:staticcheck
 
-	got, errReq := s.GetComponentContributors(ctx, &request)
+	got, errReq := s.GetComponentContributors(ctx, &request) //nolint:staticcheck
 	if errReq != nil {
 		t.Logf("unexpected error on request %+v", errReq)
 	}
@@ -290,13 +290,13 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		request          common.ComponentsRequest
-		expectedResponse pb.ComponentsContributorResponse
+		request          *common.ComponentsRequest
+		expectedResponse *pb.ComponentsContributorResponse
 		expectError      bool
 	}{
 		{
 			name: "Should_Return_OneResult",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
 					{
 						Purl: "pkg:github/scanoss/engine",
@@ -306,35 +306,35 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 					},
 				},
 			},
-			expectedResponse: pb.ComponentsContributorResponse{
+			expectedResponse: &pb.ComponentsContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_failed_status",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
 					{
 						Purl: "pkg:github/scanoss/engines",
 					},
 				},
 			},
-			expectedResponse: pb.ComponentsContributorResponse{
+			expectedResponse: &pb.ComponentsContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_success_status",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
 					{
 						Purl: "pkg:github/scanoss/engine",
 					},
 				},
 			},
-			expectedResponse: pb.ComponentsContributorResponse{
+			expectedResponse: &pb.ComponentsContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
@@ -343,7 +343,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, errReq := s.GetCountryContributorsByComponents(ctx, &tt.request)
+			r, errReq := s.GetCountryContributorsByComponents(ctx, tt.request)
 			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
 				t.Errorf("service.GetCountryContributorsByComponents() = %v, want %v", r, tt.expectedResponse)
 			}
@@ -382,36 +382,36 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		request          common.ComponentRequest
-		expectedResponse pb.ComponentContributorResponse
+		request          *common.ComponentRequest
+		expectedResponse *pb.ComponentContributorResponse
 		expectError      bool
 	}{
 		{
 			name: "Should_Return_status-failed",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/torvalds/uemacs",
 			},
-			expectedResponse: pb.ComponentContributorResponse{
+			expectedResponse: &pb.ComponentContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_failed_status",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/scanoss/engines",
 			},
-			expectedResponse: pb.ComponentContributorResponse{
+			expectedResponse: &pb.ComponentContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_success_status",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/scanoss/engine",
 			},
-			expectedResponse: pb.ComponentContributorResponse{
+			expectedResponse: &pb.ComponentContributorResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
@@ -420,7 +420,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, errReq := s.GetCountryContributorsByComponent(ctx, &tt.request)
+			r, errReq := s.GetCountryContributorsByComponent(ctx, tt.request)
 			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
 				t.Errorf("service.GetCountryContributorsByComponent() = %v, want %v", r, tt.expectedResponse)
 			}
@@ -459,51 +459,51 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		request          common.ComponentsRequest
-		expectedResponse pb.ComponentsOriginResponse
+		request          *common.ComponentsRequest
+		expectedResponse *pb.ComponentsOriginResponse
 		expectError      bool
 	}{
 		{
 			name: "Should_Return_OneResult",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
+					{
+						Purl: "pkg:github/scanoss/unexistent",
+					},
 					{
 						Purl: "pkg:github/scanoss/engine",
 					},
-					{
-						Purl: "pkg:github/torvalds/uemacs",
-					},
 				},
 			},
-			expectedResponse: pb.ComponentsOriginResponse{
+			expectedResponse: &pb.ComponentsOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_failed_status",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
 					{
 						Purl: "pkg:github/scanoss/unexistent",
 					},
 				},
 			},
-			expectedResponse: pb.ComponentsOriginResponse{
+			expectedResponse: &pb.ComponentsOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_success_status",
-			request: common.ComponentsRequest{
+			request: &common.ComponentsRequest{
 				Components: []*common.ComponentRequest{
 					{
 						Purl: "pkg:github/scanoss/engine",
 					},
 				},
 			},
-			expectedResponse: pb.ComponentsOriginResponse{
+			expectedResponse: &pb.ComponentsOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
@@ -512,7 +512,7 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, errReq := s.GetOriginByComponents(ctx, &tt.request)
+			r, errReq := s.GetOriginByComponents(ctx, tt.request)
 			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
 				t.Errorf("service.GetOriginByComponents() = %v, want %v", r, tt.expectedResponse)
 			}
@@ -551,36 +551,36 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		request          common.ComponentRequest
-		expectedResponse pb.ComponentOriginResponse
+		request          *common.ComponentRequest
+		expectedResponse *pb.ComponentOriginResponse
 		expectError      bool
 	}{
 		{
 			name: "Should_Return_status-failed",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/torvalds/uemacs",
 			},
-			expectedResponse: pb.ComponentOriginResponse{
+			expectedResponse: &pb.ComponentOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_failed_status",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/scanoss/engines",
 			},
-			expectedResponse: pb.ComponentOriginResponse{
+			expectedResponse: &pb.ComponentOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
 			},
 			expectError: false,
 		},
 		{
 			name: "Should_return_success_status",
-			request: common.ComponentRequest{
+			request: &common.ComponentRequest{
 				Purl: "pkg:github/scanoss/engine",
 			},
-			expectedResponse: pb.ComponentOriginResponse{
+			expectedResponse: &pb.ComponentOriginResponse{
 				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
@@ -589,7 +589,7 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, errReq := s.GetOriginByComponent(ctx, &tt.request)
+			r, errReq := s.GetOriginByComponent(ctx, tt.request)
 			if (tt.expectError && errReq == nil) || (!tt.expectError && errReq != nil) {
 				t.Errorf("service.GetOriginByComponent() = %v, want %v", r, tt.expectedResponse)
 			}
@@ -690,12 +690,12 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var request common.PurlRequest
+			var request common.PurlRequest //nolint:staticcheck
 			err := json.Unmarshal([]byte(tt.request), &request)
 			if err != nil {
 				t.Errorf("an error '%s' was not expected when parsing input json", err)
 			}
-			r, errReq := s.GetComponentOrigin(ctx, &request)
+			r, errReq := s.GetComponentOrigin(ctx, &request) //nolint:staticcheck
 			if errReq != nil && !tt.expectError {
 				t.Logf("unexpected error on request %+v", errReq)
 			}
