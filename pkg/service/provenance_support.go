@@ -84,3 +84,116 @@ func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.Or
 	}
 	return &depResp, nil
 }
+
+// componentsRequestToDTO converts a components request into an internal ComponentDTO
+func componentsRequestToDTO(request *common.ComponentsRequest) ([]dtos.ComponentDTO, error) {
+	if (request.Components == nil) || (len(request.Components) == 0) {
+		return []dtos.ComponentDTO{}, se.NewBadRequestError("No components supplied. At least one component should be supplied", nil)
+	}
+	var componentDTOS = []dtos.ComponentDTO{}
+	var emptyPurl []string
+	for _, c := range request.Components {
+		if c.Purl == "" {
+			emptyPurl = append(emptyPurl, c.Purl)
+			continue
+		}
+		componentDTOS = append(componentDTOS, dtos.ComponentDTO{
+			Purl:        c.Purl,
+			Requirement: c.Requirement,
+		})
+	}
+	if len(emptyPurl) > len(componentDTOS) {
+		return []dtos.ComponentDTO{}, se.NewBadRequestError("Empty purl supplied. At least one component should be supplied", nil)
+	}
+	return componentDTOS, nil
+}
+
+// componentRequestToDTO converts a component request into an internal ComponentDTO
+func componentRequestToDTO(request *common.ComponentRequest) ([]dtos.ComponentDTO, error) {
+	if request == nil || request.Purl == "" {
+		return []dtos.ComponentDTO{}, se.NewBadRequestError("No component supplied. A component needs to be supplied", nil)
+	}
+	var componentDTOS = []dtos.ComponentDTO{}
+	componentDTOS = append(componentDTOS, dtos.ComponentDTO{
+		Purl:        request.Purl,
+		Requirement: request.Requirement,
+	})
+
+	return componentDTOS, nil
+}
+
+// toComponentsContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
+func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.ComponentsContributorResponse, error) {
+	response := pb.ComponentsContributorResponse{
+		ComponentsLocations: make([]*pb.ComponentLocationInfo, len(output.Provenance)),
+	}
+	for i, p := range output.Provenance {
+		curatedLocations := []*pb.CuratedLocation{}
+		for _, c := range p.CuratedLocations {
+			curatedLocations = append(curatedLocations, &pb.CuratedLocation{
+				Country: c.Country,
+				Count:   int32(c.Count),
+			})
+		}
+
+		declaredLocations := []*pb.DeclaredLocation{}
+		for _, d := range p.DeclaredLocations {
+			declaredLocations = append(declaredLocations, &pb.DeclaredLocation{
+				Type:     d.Type,
+				Location: d.Location,
+			})
+		}
+
+		response.ComponentsLocations[i] = &pb.ComponentLocationInfo{
+			Purl:              p.Purl,
+			CuratedLocations:  curatedLocations,
+			DeclaredLocations: declaredLocations,
+		}
+	}
+	return &response, nil
+}
+
+// toComponentContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
+func toComponentContributorResponse(output dtos.ProvenanceOutput) (*pb.ComponentContributorResponse, error) {
+	response := pb.ComponentContributorResponse{}
+	componentsContributors, err := toComponentsContributorResponse(output)
+	if err != nil {
+		return &response, se.NewInternalError("Error provenance data to response", err)
+	}
+	response.ComponentLocations = componentsContributors.ComponentsLocations[0]
+	return &response, nil
+}
+
+// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct
+func toComponentsOriginResponse(output dtos.OriginOutput) (*pb.ComponentsOriginResponse, error) {
+	response := pb.ComponentsOriginResponse{
+		ComponentsLocations: make([]*pb.ComponentLocation, len(output.Provenance)),
+	}
+	for i, p := range output.Provenance {
+		locations := []*pb.Location{}
+		for _, c := range p.Countries {
+			locations = append(locations, &pb.Location{
+				Name:       c.Name,
+				Percentage: float32(c.Percentage),
+			})
+		}
+		response.ComponentsLocations[i] = &pb.ComponentLocation{
+			Purl:      p.Purl,
+			Locations: locations,
+		}
+	}
+	return &response, nil
+}
+
+// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct
+func toComponentOriginResponse(output dtos.OriginOutput) (*pb.ComponentOriginResponse, error) {
+	response := pb.ComponentOriginResponse{
+		ComponentLocations: &pb.ComponentLocation{},
+	}
+	componentsOriginsResponse, err := toComponentsOriginResponse(output)
+	if err != nil {
+		return &response, se.NewInternalError("Error provenance data to response", err)
+	}
+	response.ComponentLocations = componentsOriginsResponse.ComponentsLocations[0]
+	return &response, nil
+}

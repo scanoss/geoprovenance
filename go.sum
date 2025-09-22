@@ -560,6 +560,7 @@ github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
+github.com/grpc-ecosystem/grpc-gateway v1.16.0 h1:gmcG1KaJ57LophUzW0Hy8NmPhnMZb4M0+kPpLofRdBo=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0/go.mod h1:hgWBS7lorOAVIJEQMi4ZsPv9hVvWI6+ch50m39Pf2Ks=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3/go.mod h1:o//XUCC/F+yRGJoPO/VU0GSB0f8Nhgmxx0VIRUvaC0w=
@@ -622,6 +623,8 @@ github.com/scanoss/go-grpc-helper v0.9.0 h1:lK9JtKtyOqR9XxjnYR0wbW5KCNDH82P1E1LJ
 github.com/scanoss/go-grpc-helper v0.9.0/go.mod h1:EPI1NBg+DJ+krWehxC9eHyNpM5Pii5odOJcNdNG9qA0=
 github.com/scanoss/ipfilter/v2 v2.0.2 h1:GaB9i8kVJg9JQZm5XGStYkEpiaCVdsrj7ezI2wV/oh8=
 github.com/scanoss/ipfilter/v2 v2.0.2/go.mod h1:AwrpX4XGbZ7EKISMi1d6E5csBk1nWB8+ugpvXHFcTpA=
+github.com/scanoss/papi v0.7.2 h1:RdILfOVelqANeM05OC/rXKrOQqzSfaUfj68eHWvVzVc=
+github.com/scanoss/papi v0.7.2/go.mod h1:pqi3lfS79CwrNvYUKpiVVKc0BR+CFwrgksf4mVmVbRs=
 github.com/scanoss/zap-logging-helper v0.4.0 h1:2qTYoaFa9+MlD2/1wmPtiDHfh+42NIEwgKVU3rPpl0Y=
 github.com/scanoss/zap-logging-helper v0.4.0/go.mod h1:9QuEZcq73g/0Izv1tWeOWukoIK0oTBzM4jSNQ5kRR1w=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=

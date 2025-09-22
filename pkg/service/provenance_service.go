@@ -64,7 +64,7 @@ func NewProvenanceServer(db *sqlx.DB, config *myconfig.ServerConfig) pb.GeoProve
 	}
 }
 
-// RequestHandler defines the core handler function type for processing component requests.
+// UseCaseHandler defines the core handler function type for processing component requests.
 // It abstracts the common pattern of taking component DTOs and returning processed data
 // along with a query summary for status reporting.
 //
@@ -77,7 +77,7 @@ func NewProvenanceServer(db *sqlx.DB, config *myconfig.ServerConfig) pb.GeoProve
 //   - interface{}: Processed data (type varies by specific handler implementation)
 //   - models.QuerySummary: Summary of query execution including success/failure counts
 //   - error: Any error encountered during processing
-type RequestHandler func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error)
+type UseCaseHandler func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error)
 
 // ResponseBuilder defines a generic function type for building typed responses from
 // processed data and status information. It provides type safety while avoiding
@@ -94,6 +94,59 @@ type RequestHandler func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.C
 //   - T: Fully constructed response of the specified type
 type ResponseBuilder[T any] func(data interface{}, status *common.StatusResponse) T
 
+type RequestConverter[R any] func(R) ([]dtos.ComponentDTO, error)
+
+// executeRequestPipeline provides a unified abstraction for handling gRPC requests with
+// common concerns like input validation, error handling, and response building.
+// This function encapsulates the standard request processing pipeline used across
+// different service endpoints.
+//
+// Type Parameters:
+//   - T: The response type to be returned (e.g., *pb.ContributorResponse)
+//   - R: The request type to be processed (e.g., *common.PurlRequest, *common.ComponentsRequest)
+//
+// Parameters:
+//   - ctx: Request context for cancellation and timeout handling
+//   - req: Request containing component information to process
+//   - converter: Function that converts the request to internal DTOs
+//   - useCaseHandler: Business logic handler that processes the validated input
+//   - responseBuilder: Function that constructs the final typed response
+//
+// Returns:
+//   - T: Fully constructed response with either success data or error status
+//
+// The function follows this processing pipeline:
+// 1. Extract logger from context
+// 2. Validate and convert input to internal DTOs using the provided converter
+// 3. Execute business logic handler
+// 4. Build status response from query summary
+// 5. Construct and return typed response
+func executeRequestPipeline[T any, R any](
+	ctx context.Context,
+	req R,
+	converter RequestConverter[R],
+	useCaseHandler UseCaseHandler,
+	responseBuilder ResponseBuilder[T],
+) T {
+	s := ctxzap.Extract(ctx).Sugar()
+	// Input validation
+	dto, err := converter(req)
+	if err != nil {
+		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
+	}
+
+	// Use case call
+	data, summary, err := useCaseHandler(ctx, s, dto)
+	if err != nil {
+		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
+	}
+	status, err := buildStatusResponse(ctx, s, summary)
+	if err != nil {
+		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
+	}
+	return responseBuilder(data, status)
+}
+
 // handleLegacyRequest provides a unified abstraction for handling gRPC requests with
 // common concerns like input validation, error handling, and response building.
 // This function encapsulates the standard request processing pipeline used across
@@ -105,7 +158,7 @@ type ResponseBuilder[T any] func(data interface{}, status *common.StatusResponse
 // Parameters:
 //   - ctx: Request context for cancellation and timeout handling
 //   - req: PURL request containing component information to process
-//   - handler: Business logic handler that processes the validated input
+//   - useCaseHandler: Business logic handler that processes the validated input
 //   - responseBuilder: Function that constructs the final typed response
 //
 // Returns:
@@ -120,26 +173,74 @@ type ResponseBuilder[T any] func(data interface{}, status *common.StatusResponse
 func handleLegacyRequest[T any](
 	ctx context.Context,
 	req *common.PurlRequest,
-	handler RequestHandler, // use case handler
+	useCaseHandler UseCaseHandler,
 	responseBuilder ResponseBuilder[T],
 ) T {
-	s := ctxzap.Extract(ctx).Sugar()
-	// Input validation
-	dto, err := convertProvenanceInput(req)
-	if err != nil {
-		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
-	}
+	return executeRequestPipeline(ctx, req, convertProvenanceInput, useCaseHandler, responseBuilder)
+}
 
-	// Use case call
-	data, summary, err := handler(ctx, s, dto)
-	if err != nil {
-		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
-	}
-	status, err := buildStatusResponse(ctx, s, summary)
-	if err != nil {
-		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
-	}
-	return responseBuilder(data, status)
+// handleComponentRequest provides a unified abstraction for handling gRPC requests with
+// common concerns like input validation, error handling, and response building.
+// This function encapsulates the standard request processing pipeline used across
+// different service endpoints.
+//
+// Type Parameters:
+//   - T: The response type to be returned (e.g., *pb.ContributorResponse)
+//
+// Parameters:
+//   - ctx: Request context for cancellation and timeout handling
+//   - req: components request containing component information to process
+//   - useCaseHandler: Business logic handler that processes the validated input
+//   - responseBuilder: Function that constructs the final typed response
+//
+// Returns:
+//   - T: Fully constructed response with either success data or error status
+//
+// The function follows this processing pipeline:
+// 1. Extract logger from context
+// 2. Validate and convert input to internal DTOs
+// 3. Execute business logic handler
+// 4. Build status response from query summary
+// 5. Construct and return typed response
+func handleComponentsRequest[T any](
+	ctx context.Context,
+	req *common.ComponentsRequest,
+	useCaseHandler UseCaseHandler,
+	responseBuilder ResponseBuilder[T],
+) T {
+	return executeRequestPipeline(ctx, req, componentsRequestToDTO, useCaseHandler, responseBuilder)
+}
+
+// handleComponentRequest provides a unified abstraction for handling gRPC requests with
+// common concerns like input validation, error handling, and response building.
+// This function encapsulates a component request processing pipeline used across
+// different service endpoints.
+//
+// Type Parameters:
+//   - T: The response type to be returned (e.g., *pb.ComponentContributorRespons)
+//
+// Parameters:
+//   - ctx: Request context for cancellation and timeout handling
+//   - req: component request containing component information to process
+//   - useCaseHandler: Business logic handler that processes the validated input
+//   - responseBuilder: Function that constructs the final typed response
+//
+// Returns:
+//   - T: Fully constructed response with either success data or error status
+//
+// The function follows this processing pipeline:
+// 1. Extract logger from context
+// 2. Validate and convert input to internal DTOs
+// 3. Execute business logic handler
+// 4. Build status response from query summary
+// 5. Construct and return typed response
+func handleComponentRequest[T any](
+	ctx context.Context,
+	req *common.ComponentRequest,
+	useCaseHandler UseCaseHandler,
+	responseBuilder ResponseBuilder[T],
+) T {
+	return executeRequestPipeline(ctx, req, componentRequestToDTO, useCaseHandler, responseBuilder)
 }
 
 // Echo implements a simple echo service for health checks and connectivity testing.
@@ -200,23 +301,58 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 	return result, nil
 }
 
+func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context, request *common.ComponentsRequest) (*pb.ComponentsContributorResponse, error) {
+	result := handleComponentsRequest[*pb.ComponentsContributorResponse](ctx, request,
+		// Component contributors use case call
+		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
+			data, summary, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
+			if err != nil {
+				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
+			}
+			response, err := toComponentsContributorResponse(data)
+			return response, summary, err
+		},
+		// Set status on response
+		func(data interface{}, status *common.StatusResponse) *pb.ComponentsContributorResponse {
+			if contributorResponse, ok := data.(*pb.ComponentsContributorResponse); ok && contributorResponse != nil {
+				contributorResponse.Status = status
+				return contributorResponse
+			}
+			resp := &pb.ComponentsContributorResponse{Status: status}
+			return resp
+		},
+	)
+	return result, nil
+}
+
+func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context, request *common.ComponentRequest) (*pb.ComponentContributorResponse, error) {
+	result := handleComponentRequest[*pb.ComponentContributorResponse](ctx, request,
+		// Component contributors use case call
+		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
+			data, summary, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
+			if err != nil {
+				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
+			}
+			response, err := toComponentContributorResponse(data)
+			return response, summary, err
+		},
+
+		// Set status on response
+		func(data interface{}, status *common.StatusResponse) *pb.ComponentContributorResponse {
+			if contributorResponse, ok := data.(*pb.ComponentContributorResponse); ok && contributorResponse != nil {
+				contributorResponse.Status = status
+				return contributorResponse
+			}
+			resp := &pb.ComponentContributorResponse{Status: status}
+			return resp
+		},
+	)
+	return result, nil
+}
+
 // GetComponentOrigin retrieves origin information for the specified components.
 // This endpoint processes PURL (Package URL) requests to identify and return information
 // about the geographical and organizational origins of the requested software components.
-//
-// Parameters:
-//   - ctx: Request context for cancellation and timeout handling
-//   - request: PURL request containing components to analyze for origin information
-//
-// Returns:
-//   - *pb.OriginResponse: Response containing origin data and processing status
-//   - error: Always nil; errors are encoded in the response status
-//
-// The function uses the handleLegacyRequest abstraction to:
-// 1. Validate input PURLs and convert to internal DTOs
-// 2. Execute origin use case to retrieve geographical origin data
-// 3. Convert output to protobuf format
-// 4. Build appropriate status response based on processing results
 func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) {
 	result := handleLegacyRequest[*pb.OriginResponse](ctx, request,
 		// Component contributors use case call
@@ -234,6 +370,60 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 			if provData, ok := data.(*pb.OriginResponse); ok && provData != nil {
 				resp.Purls = provData.Purls
 			}
+			return resp
+		},
+	)
+	return result, nil
+}
+
+// GetOriginByComponents retrieves origin information for the specified components.
+// This endpoint processes PURL (Package URL) requests to identify and return information
+// about the geographical and organizational origins of the requested software components.
+func (p provenanceServer) GetOriginByComponents(ctx context.Context, request *common.ComponentsRequest) (*pb.ComponentsOriginResponse, error) {
+	result := handleComponentsRequest[*pb.ComponentsOriginResponse](ctx, request,
+		// Component contributors use case call
+		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
+			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
+			if err != nil {
+				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
+			}
+			response, err := toComponentsOriginResponse(data)
+			return response, summary, err
+		},
+		// Response mapping - type-safe and clear
+		func(data interface{}, status *common.StatusResponse) *pb.ComponentsOriginResponse {
+			if componentsOriginResponse, ok := data.(*pb.ComponentsOriginResponse); ok && componentsOriginResponse != nil {
+				componentsOriginResponse.Status = status
+				return componentsOriginResponse
+			}
+			resp := &pb.ComponentsOriginResponse{Status: status}
+			return resp
+		},
+	)
+	return result, nil
+}
+
+// GetOriginByComponent retrieves origin information for the specified components.
+// This endpoint processes PURL (Package URL) requests to identify and return information
+// about the geographical and organizational origins of the requested software components.
+func (p provenanceServer) GetOriginByComponent(ctx context.Context, request *common.ComponentRequest) (*pb.ComponentOriginResponse, error) {
+	result := handleComponentRequest[*pb.ComponentOriginResponse](ctx, request,
+		// Component contributors use case call
+		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
+			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
+			if err != nil {
+				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
+			}
+			response, err := toComponentOriginResponse(data)
+			return response, summary, err
+		},
+		// Response mapping - type-safe and clear
+		func(data interface{}, status *common.StatusResponse) *pb.ComponentOriginResponse {
+			if componentsOriginResponse, ok := data.(*pb.ComponentOriginResponse); ok && componentsOriginResponse != nil {
+				componentsOriginResponse.Status = status
+				return componentsOriginResponse
+			}
+			resp := &pb.ComponentOriginResponse{Status: status}
 			return resp
 		},
 	)
