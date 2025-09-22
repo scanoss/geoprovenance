@@ -5,6 +5,26 @@ Two endpoints are available for this.
 - Based on declared and human curated location
 - Based on calculations of the user data (commits, history, timezone,name)
 
+## [0.2.0] - 2025-09-23
+### Changed
+- Refactored geo provenance service core architecture
+### Added
+- New structured error handling system with ServiceError type
+- ComponentDTO for component data transfer
+- Enhanced status determination logic with HTTP status code mapping
+- Enhanced error handling with grpc metadata trailers
+- Added gRPC GetCountryContributorsByComponents and REST endpoint POST /v2/geoprovenance/countries/components
+- Added gRPC GetCountryContributorsByComponent and REST endpoint GET /v2/geoprovenance/countries/component
+- Added gRPC GetOriginByComponents and REST endpoint POST /v2/geoprovenance/origin/components
+- Added gRPC GetOriginByComponent and REST endpoint GET /v2/geoprovenance/origin/component
+### Fixed
+- Improved input validation for PURL requests
+- Better error propagation and handling throughout the service
+- Enhanced status response messaging with detailed failure information
+### Refactored
+- Simplified provenance input conversion logic
+- Enhanced query summary model with total PURLs tracking
+
 
 ## [0.1.2] - 2025-05-19
 ### Changed
@@ -43,6 +63,7 @@ Two endpoints are available for this.
 ### Added
 - Added Dockerfile EXPOSE port
 
+[0.2.0]: https://github.com/scanoss/geoprovenance/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/scanoss/geoprovenance/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/scanoss/geoprovenance/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/scanoss/geoprovenance/compare/v0.0.6...v0.1.0
