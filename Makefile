@@ -28,14 +28,18 @@ unit_test: version ## Run all unit tests in the pkg folder
 	@echo "Running unit test framework..."
 	go test -v ./pkg/...
 
+unit_test_coverage:  ## Run all unit tests in the pkg folder and get test coverage
+	@echo "Running unit test with coverage..."
+	go test -coverprofile=coverage.txt ./... && go tool cover -func=coverage.txt && go tool cover -o coverage.html -html=coverage.txt
+
 lint_local: ## Run local instance of linting across the code base
 	golangci-lint run ./...
 
 lint_local_fix: ## Run local instance of linting across the code base including auto-fixing
 	golangci-lint run --fix ./...
 
-lint_docker: ## Run docker instance of linting across the code base
-	docker run --rm -v $(pwd):/app -v ~/.cache/golangci-lint/v1.50.1:/root/.cache -w /app golangci/golangci-lint:v1.50.1 golangci-lint run ./...
+lint_docker: version ## Run docker instance of linting across the code base
+	docker run --rm -v $(PWD):/app -v ~/.cache/golangci-lint/v1.64.2:/root/.cache -w /app golangci/golangci-lint:v1.64.2 golangci-lint run ./...
 
 run_local:  ## Launch the API locally for test
 	@echo "Launching API locally..."

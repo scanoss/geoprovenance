@@ -15,6 +15,10 @@
 # Ingore the version text file. only used during build
 version.txt
 
+# Ignore env files
+.env
+*.env
+
 tmp/
 
 # Ignore package files
@@ -23,6 +27,9 @@ tmp/
 *.gz
 *.zip
 
-.DS_Store
+# Coverage tool output
+*.out
+coverage.txt
+coverage.html
 
-scripts/scanoss-*-api
+.DS_Store

@@ -16,13 +16,6 @@
 
 package dtos
 
-import (
-	"encoding/json"
-	"errors"
-
-	zlog "scanoss.com/provenance/pkg/logger"
-)
-
 type ProvenanceOutput struct {
 	Provenance []ProvenanceOutputItem `json:"purls"`
 }
@@ -41,14 +34,4 @@ type DeclaredProvenanceItem struct {
 type CuratedProvenanceItem struct {
 	Country string `json:"country"`
 	Count   int    `json:"count"`
-}
-
-// ExportProvenanceOutput converts the ProvenanceOutput structure to a byte array
-func ExportProvenanceOutput(output ProvenanceOutput) ([]byte, error) {
-	data, err := json.Marshal(output)
-	if err != nil {
-		zlog.S.Errorf("Parse failure: %v", err)
-		return nil, errors.New("failed to produce JSON from provenance output data")
-	}
-	return data, nil
 }

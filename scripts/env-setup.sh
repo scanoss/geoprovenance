@@ -17,9 +17,14 @@ if [ "$1" = "-h" ] || [ "$1" = "-help" ] ; then
   exit 1
 fi
 
-CONF_DIR=/usr/local/etc/scanoss/geoprovenance
-LOGS_DIR=/var/log/scanoss/geoprovenance
-CONF_DOWNLOAD=https://raw.githubusercontent.com/scanoss/geoprovenance/main/config/app-config-prod.json
+export BASE_C_PATH=/usr/local/etc/scanoss
+export CONFIG_DIR="$BASE_C_PATH/geoprovenance"
+export LOGS_DIR=/var/log/scanoss/geoprovenance
+export DB_PATH_BASE=/var/lib/scanoss
+export SQLITE_PATH="${DB_PATH_BASE}/db/sqlite/geoprovenance"
+export SQLITE_DB_NAME=base.sqlite
+export TARGET_SQLITE_DB_NAME=geoprovenance.sqlite
+export CONF_DOWNLOAD=https://raw.githubusercontent.com/scanoss/geoprovenance/main/config/app-config-prod.json
 
 ENVIRONMENT=""
 FORCE_INSTALL=0
@@ -69,7 +74,7 @@ else
 fi
 # Setup all the required folders and ownership
 echo "Setting up Geo Provenance API system folders..."
-if ! mkdir -p "$CONF_DIR" ; then
+if ! mkdir -p "$CONFIG_DIR" ; then
   echo "mkdir failed"
   exti 1
 fi
@@ -118,28 +123,162 @@ if ! chmod +x /usr/local/bin/scanoss-geoprovenance-api.sh ; then
   echo "Provenance api startup script permissions failed"
   exit 1
 fi
-# Copy in the configuration file if requested
+
+####################################################
+#                SEARCH CONFIG FILE                #
+####################################################
 CONF=app-config-prod.json
 if [ -n "$ENVIRONMENT" ] ; then
   CONF="app-config-${ENVIRONMENT}.json"
 fi
-if [ -f "$SCRIPT_DIR/$CONF" ] ; then
-  echo "Copying app config to $CONF_DIR ..."
-  if ! cp "$SCRIPT_DIR/$CONF" "$CONF_DIR/" ; then
-    echo "copy $CONF failed"
+CONFIG_FILE_PATH=""
+# Search on current dir
+if [ -f "./$CONF" ]; then
+    CONFIG_FILE_PATH="./$CONF"
+# Search on parent dir
+elif [ -f "../$CONF" ]; then
+    CONFIG_FILE_PATH="../$CONF"
+fi
+############### END SEARCH CONFIG FILE ##############
+
+####################################################
+#                   SETUP SQLITE DB                #
+####################################################
+SQLITE_DB_PATH=""
+# Search on current dir
+if [ -f "./$SQLITE_DB_NAME" ]; then
+    SQLITE_DB_PATH="./$SQLITE_DB_NAME"
+# Search on parent dir
+elif [ -f "../$SQLITE_DB_NAME" ]; then
+    SQLITE_DB_PATH="../$SQLITE_DB_NAME"
+fi
+# Create SQLite DB dir
+if [ ! -d "$SQLITE_PATH" ] ; then
+  if ! mkdir -p "$SQLITE_PATH"; then
+    echo "Error: Failed to create directory: $SQLITE_PATH"
     exit 1
   fi
-else
-  if [ ! -f "$CONF_DIR/$CONF" ] ; then
-    read -p "Download sample $CONF (y/n) [y]? " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Nn]$ ]] ; then
-      echo "Please put the config file into: $CONF_DIR/$CONF"
-    elif ! curl $CONF_DOWNLOAD > "$CONF_DIR/$CONF" ; then
-      echo "Warning: curl download failed"
-    fi
-  fi
 fi
+## If SQLite DB is found.
+SQLITE_TARGET_PATH="$SQLITE_PATH/$TARGET_SQLITE_DB_NAME"
+if [ -n "$SQLITE_DB_PATH" ]; then
+    # If the target DB already exists, ask to replace it.
+    if [ -f "$SQLITE_TARGET_PATH" ]; then
+        read -p "SQLite file found at $(realpath "$SQLITE_DB_PATH"). Do you want to replace the ${SQLITE_TARGET_PATH}? (n/y) [n]: " -n 1 -r
+              echo
+       if [[ "$REPLY" =~ ^[Yy]$ ]] ; then
+          echo "Copying SQLite from $(realpath "$SQLITE_DB_PATH") to $SQLITE_PATH"
+          echo "Please be patient, this process might take some minutes..."
+          if ! cp "$SQLITE_DB_PATH" "$SQLITE_TARGET_PATH"; then
+              echo "Error: Failed to copy SQLite database."
+              exit 1
+          fi
+          echo "Database successfully copied."
+       else
+         echo "Skipping DB copy."
+       fi
+    else
+       # Copy database
+       echo "Copying SQLite from $(realpath "$SQLITE_DB_PATH") to $SQLITE_PATH"
+       echo "Please be patient, this process might take some minutes."
+       if ! cp "$SQLITE_DB_PATH" "$SQLITE_TARGET_PATH"; then
+           echo "Error: Failed to copy SQLite database from $SQLITE_DB_PATH to $SQLITE_PATH"
+           exit 1
+       fi
+       echo "Database successfully copied."
+    fi
+else
+  echo "Warning: No SQLite DB detected. Skipping DB setup."
+fi
+if [ ! -f "$SQLITE_TARGET_PATH" ] ; then
+  echo "Warning: No database exists at: $SQLITE_TARGET_PATH"
+  echo "Service startup will most likely fail."
+fi
+############### END SETUP SQLITE DB ################
+
+
+####################################################
+#                  COPY CONFIG FILE                #
+####################################################
+TARGET_CONFIG_PATH="$CONFIG_DIR/$CONF"
+if [ -n "$CONFIG_FILE_PATH" ]; then
+  if [ -f "$TARGET_CONFIG_PATH" ]; then
+      read -p "Configuration file found at $(realpath "$TARGET_CONFIG_PATH"). Do you want to replace $TARGET_CONFIG_PATH? (n/y) [n]: " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]] ; then
+          echo "Copying config file from $(realpath "$CONFIG_FILE_PATH") to $CONFIG_DIR ..."
+          if ! cp "$CONFIG_FILE_PATH" "$CONFIG_DIR/"; then
+            echo "Error: Failed to copy config file."
+            exit 1
+          fi
+        else
+          echo "Skipping config file copy."
+        fi
+  else
+      echo "Copying config file from $(realpath "$CONFIG_FILE_PATH") to $CONFIG_DIR ..."
+      if ! cp "$CONFIG_FILE_PATH" "$CONFIG_DIR/"; then
+        echo "Error: Failed to copy config file."
+        exit 1
+      fi
+  fi
+else
+   read -p "Configuration file not found. Do you want to download an example $CONF file? (n/y) [n]: " -n 1 -r
+        echo
+      if [[ $REPLY =~ ^[Yy]$ ]] ; then
+        if curl $CONF_DOWNLOAD_URL > "$CONFIG_DIR/$CONF" ; then
+          echo "Configuration file successfully downloaded to $CONFIG_DIR/$CONF"
+        else
+          echo "Error: Failed to download configuration file from $CONF_DOWNLOAD_URL"
+        fi
+      else
+        echo "Warning: Please put the config file into: $CONFIG_DIR/$CONF"
+      fi
+fi
+
+if [ ! -f "$TARGET_CONFIG_PATH" ] ; then
+  echo "Warning: No application config file in place: $TARGET_CONFIG_PATH"
+  echo "Service startup will most likely fail, especially in relation to the DB location."
+fi
+################ END CONFIG FILE ##################
+
+
+####################################################
+#         CHANGE OWNERSHIP AND PERMISSIONS         #
+####################################################
+# Change ownership to config folder
+if ! chown -R $RUNTIME_USER:$RUNTIME_USER "$BASE_C_PATH"; then
+  echo "Error: Problem changing ownership to config folder: $BASE_C_PATH"
+  exit 1
+fi
+# Change permissions to config folder
+if ! find "$CONFIG_DIR" -type d -exec chmod 0750 "{}" \; ; then
+  echo "Error: Problem changing permissions to config folder: $CONFIG_DIR"
+  exit 1
+fi
+# Change permissions to config folder files
+if ! find "$CONFIG_DIR" -type f -exec chmod 0600 "{}" \; ; then
+  echo "Error: Problem changing permissions to config files within: $CONFIG_DIR"
+  exit 1
+fi
+# Change ownership to SQLite folder
+if ! chown -R $RUNTIME_USER:$RUNTIME_USER "$DB_PATH_BASE"; then
+    echo "Error: Failed to change ownership to $RUNTIME_USER"
+    echo "Please check if the user exists and you have proper permissions."
+    exit 1
+fi
+# Change permissions to config folder
+if ! find "$DB_PATH_BASE" -type d -exec chmod 0750 "{}" \; ; then
+  echo "Error: Problem changing permissions to DB folder: $CONFIG_DIR"
+  exit 1
+fi
+# Change permissions to config folder files
+if ! find "$DB_PATH_BASE" -type f -exec chmod 0640 "{}" \; ; then
+  echo "Error: Problem changing permissions to DB files within: $CONFIG_DIR"
+  exit 1
+fi
+######  END CHANGE OWNERSHIP AND PERMISSIONS #######
+
+
 # Copy the binaries if requested
 BINARY=scanoss-geoprovenance-api
 if [ -f "$SCRIPT_DIR/$BINARY" ] ; then
@@ -165,14 +304,14 @@ if [ "$service_stopped" == "true" ] ; then
   fi
   systemctl status "$SC_SERVICE_NAME"
 fi
-if [ ! -f "$CONF_DIR/$CONF" ] ; then
+if [ ! -f "$CONFIG_DIR/$CONF" ] ; then
   echo
-  echo "Warning: Please create a configuration file in: $CONF_DIR/$CONF"
+  echo "Warning: Please create a configuration file in: $CONFIG_DIR/$CONF"
   echo "A sample version can be downloaded from GitHub:"
-  echo "curl $CONF_DOWNLOAD > $CONF_DIR/$CONF"
+  echo "curl $CONF_DOWNLOAD > $CONFIG_DIR/$CONF"
 fi
 echo
-echo "Review service config in: $CONF_DIR/$CONF"
+echo "Review service config in: $CONFIG_DIR/$CONF"
 echo "Logs are stored in: $LOGS_DIR"
 echo "Start the service using: systemctl start $SC_SERVICE_NAME"
 echo "Stop the service using: systemctl stop $SC_SERVICE_NAME"

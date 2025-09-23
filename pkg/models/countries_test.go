@@ -19,22 +19,23 @@ package models
 import (
 	"context"
 	"fmt"
+	_ "modernc.org/sqlite"
+	zlog "scanoss.com/provenance/pkg/logger"
 	"testing"
-	"time"
 
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/exp/rand"
-	zlog "scanoss.com/provenance/pkg/logger"
+	"math/rand/v2"
 )
 
-func TestCountryLookoup(t *testing.T) {
+func TestCountryLookUp(t *testing.T) {
 	ctx := context.Background()
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
 	}
 	defer zlog.SyncZap()
-	db, err := sqlx.Connect("sqlite3", ":memory:")
+	s := zlog.L.Sugar()
+	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -44,23 +45,21 @@ func TestCountryLookoup(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer CloseConn(conn)
-	err = loadTestSqlDataFiles(db, ctx, conn, []string{"../models/tests/countries.sql"})
+	err = LoadTestSqlData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to load SQL test data: %v", err)
 	}
-	countryModel := NewCountryMapModel(ctx, conn)
+	countryModel := NewCountryMapModel(db)
 	countriesToPick := []string{"Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria"}
 
-	rand.Seed(uint64(time.Now().UnixNano()))
-
-	randomIndex := rand.Intn(len(countriesToPick))
+	randomIndex := rand.IntN(len(countriesToPick))
 	dbPK := randomIndex + 1
 
 	randomElement := countriesToPick[randomIndex]
 
 	var countryName = randomElement
 	fmt.Printf("Searching for Country: %v\n", countryName)
-	gotName, err := countryModel.GetCountryById(dbPK)
+	gotName, err := countryModel.GetCountryById(ctx, s, dbPK)
 
 	if err != nil {
 		t.Errorf("Countries model error = %v", err)

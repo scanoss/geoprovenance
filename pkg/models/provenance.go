@@ -27,10 +27,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type provenanceModel struct {
-	ctx  context.Context
-	s    *zap.SugaredLogger
-	conn *sqlx.Conn
+type ProvenanceModel struct {
+	db *sqlx.DB
 }
 
 type Provenance struct {
@@ -52,12 +50,12 @@ type LocationDistribution struct {
 }
 
 // NewProvenanceModel creates a new instance of a provenance Model
-func NewProvenanceModel(ctx context.Context, conn *sqlx.Conn) *provenanceModel {
-	return &provenanceModel{ctx: ctx, conn: conn}
+func NewProvenanceModel(db *sqlx.DB) *ProvenanceModel {
+	return &ProvenanceModel{db: db}
 }
 
 // ProcessCuratedVendors assigns a list of country name to given set of id's of a set of provenance records
-func (m *provenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string]map[string]int {
+func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string]map[string]int {
 	curatedCountries := make(map[string]map[string]int)
 	for _, v := range vendors {
 		if v.CountriesId != "" {
@@ -74,11 +72,11 @@ func (m *provenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string
 			curatedCountries[v.PurlName][list[0]]++
 		}
 	}
-	return (curatedCountries)
+	return curatedCountries
 }
 
-// GetProvenanceByPurlName get declared and curated locations for contributors and authors from a list of purlnames
-func (m *provenanceModel) GetProvenanceByPurlNames(purlNames []string, purlType string) ([]Provenance, error) {
+// GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames
+func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]Provenance, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
 	list = "('" + list + "')"
@@ -108,16 +106,17 @@ func (m *provenanceModel) GetProvenanceByPurlNames(purlNames []string, purlType 
 		      AND vd.type IS NOT NULL
 		      AND vd.mine_id = 5
 		      AND vl.declared_location IS NOT NULL;`
-	err := m.conn.SelectContext(m.ctx, &allSources, query)
+
+	err := m.db.SelectContext(ctx, &allSources, query)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 	return allSources, nil
 }
 
-// GetProvenanceByPurlName get declared and curated locations for contributors and authors from a list of purlnames
-func (m *provenanceModel) GetTooManyContributors(purlNames []string, purlType string) ([]string, error) {
+// GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames
+func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]string, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
 	list = "('" + list + "')"
@@ -127,16 +126,16 @@ func (m *provenanceModel) GetTooManyContributors(purlNames []string, purlType st
 			from too_many_contributors tmc 
 			where tmc.purl_name in ` + list + `
 		      AND tmc.mine_id = 5;`
-	err := m.conn.SelectContext(m.ctx, &purls, query)
+	err := m.db.SelectContext(ctx, &purls, query)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 
 	return purls, nil
 }
 
-func (m *provenanceModel) GetTimeZoneOriginByPurlName(purlName string, purlType string) ([]Origin, error) {
+func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(ctx context.Context, s *zap.SugaredLogger, purlName string) ([]Origin, error) {
 
 	var allSources []Origin
 	query := `
@@ -158,41 +157,10 @@ ORDER BY
   vendor_count DESC;
 
 `
-	err := m.conn.SelectContext(m.ctx, &allSources, query, purlName)
+	err := m.db.SelectContext(ctx, &allSources, query, purlName)
 	if err != nil {
-		m.s.Errorf("Error: Failed to query %v: %+v", purlName, err)
+		s.Errorf("Error: Failed to query %v: %+v", purlName, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
 	}
 	return allSources, nil
 }
-
-/*
-func (m *provenanceModel) GetCuratedLocationByPurlName(purlName string, purlType string) ([]Origin, error) {
-
-	var allSources []Origin
-	query := `
-	SELECT
-    	c.country_name as country, COUNT(DISTINCT vl.vendor_id) AS vendor_count
-	FROM
-    	vendor_locations vl, github_contributors gc, vendors v
-CROSS JOIN
-    unnest(vl.curated_countries_ids) AS unnested_country_id
-JOIN
-    countries c ON c.id = unnested_country_id
-WHERE
-    v.username = gc.contributor
-    AND gc.purl_name = $1
-    AND vl.vendor_id = v.id
-GROUP BY
-    c.id, c.country_name, c.country_code
-ORDER BY
-    vendor_count DESC;`
-	err := m.conn.SelectContext(m.ctx, &allSources, query, purlName)
-	if err != nil {
-		fmt.Printf("\n\n%+v\n", err)
-		m.s.Errorf("Error: Failed to query %v: %+v", purlName, err)
-		return nil, fmt.Errorf("failed to query : %v", err)
-	}
-	return allSources, nil
-}
-*/

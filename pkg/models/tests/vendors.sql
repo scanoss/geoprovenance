@@ -1,4 +1,4 @@
---DROP TABLE IF EXISTS vendors;
+DROP TABLE IF EXISTS vendors;
 
 CREATE TABLE vendors (
 	id serial4 NOT NULL,
