@@ -9,7 +9,7 @@ Two endpoints are available for this.
 ### Changed
 - Integrated `go-component-helper` for component handling
 - Simplified `provenance_service.go` gRPC handler pipeline with a single generic `runPipeline`
-
+- Updated dependencies to the latest versions
 ### Added
 - Added per-component status on batch responses
 

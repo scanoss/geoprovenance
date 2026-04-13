@@ -1,19 +1,19 @@
 module scanoss.com/provenance
 
-go 1.24.4
+go 1.25.0
 
 require (
 	github.com/golobby/config/v3 v3.4.2
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/lib/pq v1.11.2
+	github.com/lib/pq v1.12.3
 	github.com/package-url/packageurl-go v0.1.5
 	github.com/scanoss/go-component-helper v0.6.0
 	github.com/scanoss/go-grpc-helper v0.14.0
 	github.com/scanoss/papi v0.35.0
 	github.com/scanoss/zap-logging-helper v0.4.0
 	go.uber.org/zap v1.27.1
-	google.golang.org/grpc v1.79.1
-	modernc.org/sqlite v1.46.1
+	google.golang.org/grpc v1.79.3
+	modernc.org/sqlite v1.48.2
 )
 
 require (
@@ -47,7 +47,7 @@ require (
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
-	modernc.org/libc v1.67.6 // indirect
+	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
@@ -61,7 +61,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
