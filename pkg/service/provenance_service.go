@@ -302,6 +302,9 @@ func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
+			if err != nil {
+				return nil, err
+			}
 			response, err := toComponentsContributorResponse(data)
 			return response, err
 		},
@@ -323,6 +326,9 @@ func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context,
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
+			if err != nil {
+				return nil, err
+			}
 			response, err := toComponentContributorResponse(data)
 			return response, err
 		},
@@ -348,6 +354,9 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
+			if err != nil {
+				return nil, err
+			}
 			response, err := convertOriginOutput(s, data)
 			return response, err
 		},
@@ -371,6 +380,9 @@ func (p provenanceServer) GetOriginByComponents(ctx context.Context, request *co
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
+			if err != nil {
+				return nil, err
+			}
 			response, err := toComponentsOriginResponse(data)
 			return response, err
 		},
@@ -395,6 +407,9 @@ func (p provenanceServer) GetOriginByComponent(ctx context.Context, request *com
 		// Component contributors use case call
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
+			if err != nil {
+				return nil, err
+			}
 			response, err := toComponentOriginResponse(data)
 			return response, err
 		},

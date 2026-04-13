@@ -32,7 +32,7 @@ import (
 
 // convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
 func convertProvenanceInput(request *common.PurlRequest) []componenthelper.ComponentDTO { //nolint:staticcheck
-	if (request.Purls == nil) || (len(request.Purls) == 0) {
+	if len(request.Purls) == 0 {
 		return []componenthelper.ComponentDTO{}
 	}
 	var componentDTOS []componenthelper.ComponentDTO
@@ -119,7 +119,7 @@ func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.Or
 
 // componentsRequestToDTO converts a components request into an internal ComponentDTO
 func componentsRequestToDTO(request *common.ComponentsRequest) []componenthelper.ComponentDTO {
-	if (request.Components == nil) || (len(request.Components) == 0) {
+	if len(request.Components) == 0 {
 		return []componenthelper.ComponentDTO{}
 	}
 	var componentDTOS []componenthelper.ComponentDTO

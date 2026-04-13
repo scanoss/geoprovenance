@@ -109,7 +109,7 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 	for _, c := range validComponents {
 		var provOutItem dtos.ProvenanceOutputItem
 		provOutItem.Purl = c.OriginalPurl
-		if !(len(vendorsMap[c.Name]) > 0) {
+		if len(vendorsMap[c.Name]) <= 0 {
 			provOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Provenance data found for the given Purl",
@@ -119,7 +119,7 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		}
 
 		listOfVendors := vendorsMap[c.Name]
-		
+
 		for _, vendor := range listOfVendors {
 			if vendor.DeclaredLocation != "" {
 				provOutItem.DeclaredLocations = append(provOutItem.DeclaredLocations, dtos.DeclaredProvenanceItem{Type: vendor.Type, Location: vendor.DeclaredLocation})
