@@ -8,6 +8,9 @@ Two endpoints are available for this.
 ## [Unreleased]
 ### Changed
 - Integrated `go-component-helper` for component handling
+- Integrated `go-component-helper` for component handling
+### Added
+- Added per-component status on batch responses
 
 ## [0.2.0] - 2025-09-23
 ### Changed

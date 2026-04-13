@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"net/http"
-	"scanoss.com/provenance/pkg/errors"
 	"scanoss.com/provenance/pkg/models"
 	"strings"
 )
@@ -46,69 +45,17 @@ func buildErrorMessages(summary models.QuerySummary) []string {
 // determineStatusAndHTTPCode analyzes the PURL processing results and determines the appropriate
 // status code and HTTP code based on the success/failure ratios.
 // Returns common.StatusCode, HTTP status code, and error.
-func determineStatusAndHTTPCode(s *zap.SugaredLogger, summary models.QuerySummary) (common.StatusResponse, int, error) {
-	var messages = buildErrorMessages(summary)
-	responseMessage := ResponseMessageSuccess
-	if len(messages) > 0 {
-		responseMessage = strings.Join(messages, " | ")
-	}
-	// Calculate failure statistics
-	totalFailedToParse := len(summary.PurlsFailedToParse)
-	totalNotFound := len(summary.PurlsNotFound)
-	totalWOInfo := len(summary.PurlsWOInfo)
-	totalFailed := totalFailedToParse + totalNotFound + totalWOInfo
-	totalSuccessful := summary.TotalPurls - totalFailed
-	totalPurls := summary.TotalPurls
-
-	// Log processing summary
-	s.Debugf("PURL Summary - Total: %d, Successful: %d, Failed to parse: %d, Not found: %d, No info: %d",
-		summary.TotalPurls, totalSuccessful, totalFailedToParse, totalNotFound, totalWOInfo)
-
-	switch {
-	case totalFailed == 0:
-		// All PURLs succeeded
-		return common.StatusResponse{
-			Message: responseMessage,
-			Status:  common.StatusCode_SUCCESS,
-		}, http.StatusOK, nil
-
-	case totalSuccessful == 0:
-		// All PURLs failed - determine HTTP code by failure type priority
-		if totalFailedToParse > 0 && totalFailedToParse >= totalPurls {
-			return common.StatusResponse{}, http.StatusBadRequest, errors.NewBadRequestError(responseMessage, nil)
-		}
-		return common.StatusResponse{}, http.StatusNotFound, errors.NewNotFoundError(responseMessage)
-
-	case len(summary.PurlsTooMuchData) > 0:
-		return common.StatusResponse{
-			Message: responseMessage,
-			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
-		}, http.StatusOK, nil
-
-	case totalWOInfo > 0:
-		return common.StatusResponse{
-			Message: responseMessage,
-			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
-		}, http.StatusOK, nil
-
-	case totalNotFound > 0 && totalNotFound < totalPurls:
-		return common.StatusResponse{
-			Message: responseMessage,
-			Status:  common.StatusCode_SUCCEEDED_WITH_WARNINGS,
-		}, http.StatusOK, nil
-
-	default:
-		// Mixed results: some succeeded, some failed
-		return common.StatusResponse{
-			Message: ResponseMessageSuccess,
-			Status:  common.StatusCode_SUCCESS,
-		}, http.StatusOK, nil
-	}
+func determineStatusAndHTTPCode(s *zap.SugaredLogger) (common.StatusResponse, int, error) {
+	// Mixed results: some succeeded, some failed
+	return common.StatusResponse{
+		Message: ResponseMessageSuccess,
+		Status:  common.StatusCode_SUCCESS,
+	}, http.StatusOK, nil
 }
 
 // buildStatusResponse constructs a StatusResponse based on PURL processing results and sets appropriate HTTP status codes.
-func buildStatusResponse(ctx context.Context, s *zap.SugaredLogger, summary models.QuerySummary) (*common.StatusResponse, error) {
-	statusResponse, httpStatusCode, err := determineStatusAndHTTPCode(s, summary)
+func buildStatusResponse(ctx context.Context, s *zap.SugaredLogger) (*common.StatusResponse, error) {
+	statusResponse, httpStatusCode, err := determineStatusAndHTTPCode(s)
 	if err != nil {
 		return &common.StatusResponse{}, err
 	}

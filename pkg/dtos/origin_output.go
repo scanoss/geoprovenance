@@ -16,6 +16,8 @@
 
 package dtos
 
+import "github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
+
 type OriginOutput struct {
 	Provenance []OriginOutputItem `json:"purls"`
 }
@@ -23,6 +25,7 @@ type OriginOutput struct {
 type OriginOutputItem struct {
 	Purl      string        `json:"purl"`
 	Countries []CountryInfo `json:"locations"`
+	Status    domain.ComponentStatus
 }
 type CountryInfo struct {
 	Name       string  `json:"name"`
