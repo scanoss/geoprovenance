@@ -24,8 +24,9 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
-	_ "modernc.org/sqlite/lib"
 	"github.com/scanoss/go-component-helper/componenthelper"
+	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
+	_ "modernc.org/sqlite/lib"
 	myconfig "scanoss.com/provenance/pkg/config"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
@@ -87,7 +88,7 @@ func TestOriginUseCase(t *testing.T) {
 		t.Fatalf("failed to load Config: %v", err)
 	}
 	provUc := NewOrigin(db)
-	countries, notFound, err := provUc.GetOrigin(ctx, s, componentDTOS)
+	countries, err := provUc.GetOrigin(ctx, s, componentDTOS)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
@@ -96,16 +97,23 @@ func TestOriginUseCase(t *testing.T) {
 
 	}
 	//fmt.Println(countries)
-	fmt.Printf("Provenance response: %+v, %+v\n", countries, notFound)
+	fmt.Printf("Provenance response: %+v\n", countries)
 	componentDTOS = []componenthelper.ComponentDTO{
 		{
 			Purl: "pkg:npm/",
 		},
 	}
 
-	countries, _, err = provUc.GetOrigin(ctx, s, componentDTOS)
-	if err == nil && len(countries.Provenance) > 0 {
-		t.Fatalf("did not get an expected error: %v", countries)
+	countries, err = provUc.GetOrigin(ctx, s, componentDTOS)
+	if err == nil {
+		if len(countries.Provenance) == 0 {
+			t.Fatalf("expected at least one item with failure status, got: %v", countries)
+		}
+		for _, item := range countries.Provenance {
+			if item.Status.StatusCode == "" || item.Status.StatusCode == domain.Success {
+				t.Fatalf("expected non-success status for invalid purl, got: %v", item.Status)
+			}
+		}
 	}
 
 }
