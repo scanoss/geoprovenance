@@ -5,6 +5,10 @@ Two endpoints are available for this.
 - Based on declared and human curated location
 - Based on calculations of the user data (commits, history, timezone,name)
 
+## [Unreleased]
+### Changed
+- Integrated `go-component-helper` for component handling
+
 ## [0.2.0] - 2025-09-23
 ### Changed
 - Refactored geo provenance service core architecture

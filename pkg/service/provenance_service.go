@@ -23,13 +23,12 @@ import (
 	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
+	"github.com/scanoss/go-component-helper/componenthelper"
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
 	"go.uber.org/zap"
 	myconfig "scanoss.com/provenance/pkg/config"
-	"scanoss.com/provenance/pkg/dtos"
 	se "scanoss.com/provenance/pkg/errors"
-	"scanoss.com/provenance/pkg/models"
 	"scanoss.com/provenance/pkg/usecase"
 )
 
@@ -77,7 +76,7 @@ func NewProvenanceServer(db *sqlx.DB, config *myconfig.ServerConfig) pb.GeoProve
 //   - interface{}: Processed data (type varies by specific handler implementation)
 //   - models.QuerySummary: Summary of query execution including success/failure counts
 //   - error: Any error encountered during processing
-type UseCaseHandler func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error)
+type UseCaseHandler func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error)
 
 // ResponseBuilder defines a generic function type for building typed responses from
 // processed data and status information. It provides type safety while avoiding
@@ -94,7 +93,7 @@ type UseCaseHandler func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.C
 //   - T: Fully constructed response of the specified type
 type ResponseBuilder[T any] func(data interface{}, status *common.StatusResponse) T
 
-type RequestConverter[R any] func(R) ([]dtos.ComponentDTO, error)
+type RequestConverter[R any] func(R) []componenthelper.ComponentDTO
 
 // executeRequestPipeline provides a unified abstraction for handling gRPC requests with
 // common concerns like input validation, error handling, and response building.
@@ -130,17 +129,14 @@ func executeRequestPipeline[T any, R any](
 ) T {
 	s := ctxzap.Extract(ctx).Sugar()
 	// Input validation
-	dto, err := converter(req)
-	if err != nil {
-		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
-	}
+	dto := converter(req)
 
 	// Use case call
-	data, summary, err := useCaseHandler(ctx, s, dto)
+	data, err := useCaseHandler(ctx, s, dto)
 	if err != nil {
 		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
 	}
-	status, err := buildStatusResponse(ctx, s, summary)
+	status, err := buildStatusResponse(ctx, s)
 	if err != nil {
 		return responseBuilder(nil, se.HandleServiceError(ctx, s, err))
 	}
@@ -280,18 +276,18 @@ func (p provenanceServer) Echo(ctx context.Context, request *common.EchoRequest)
 func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) { //nolint:staticcheck
 	result := handleLegacyRequest[*pb.ContributorResponse](ctx, request, //nolint:staticcheck
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
 
-			data, summary, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
+			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			if err != nil {
-				return nil, summary, err
+				return nil, err
 			}
 			response, err := convertProvenanceOutput(s, data)
-			return response, summary, err
+			return response, err
 		},
 		// Response mapping - type-safe and clear
 		func(data interface{}, status *common.StatusResponse) *pb.ContributorResponse { //nolint:staticcheck
-			resp := &pb.ContributorResponse{Status: status} //nolint:staticcheck
+			resp := &pb.ContributorResponse{Status: status}                            //nolint:staticcheck
 			if provData, ok := data.(*pb.ContributorResponse); ok && provData != nil { //nolint:staticcheck
 				resp.Purls = provData.Purls
 			}
@@ -304,13 +300,10 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context, request *common.ComponentsRequest) (*pb.ComponentsContributorResponse, error) {
 	result := handleComponentsRequest[*pb.ComponentsContributorResponse](ctx, request,
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
-			data, summary, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
-			if err != nil {
-				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
-			}
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
+			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			response, err := toComponentsContributorResponse(data)
-			return response, summary, err
+			return response, err
 		},
 		// Set status on response
 		func(data interface{}, status *common.StatusResponse) *pb.ComponentsContributorResponse {
@@ -328,13 +321,10 @@ func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context
 func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context, request *common.ComponentRequest) (*pb.ComponentContributorResponse, error) {
 	result := handleComponentRequest[*pb.ComponentContributorResponse](ctx, request,
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
-			data, summary, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
-			if err != nil {
-				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
-			}
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
+			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			response, err := toComponentContributorResponse(data)
-			return response, summary, err
+			return response, err
 		},
 
 		// Set status on response
@@ -356,17 +346,14 @@ func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context,
 func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) { //nolint:staticcheck
 	result := handleLegacyRequest[*pb.OriginResponse](ctx, request, //nolint:staticcheck
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
-			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
-			if err != nil {
-				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
-			}
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
+			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
 			response, err := convertOriginOutput(s, data)
-			return response, summary, err
+			return response, err
 		},
 		// Response mapping - type-safe and clear
 		func(data interface{}, status *common.StatusResponse) *pb.OriginResponse { //nolint:staticcheck
-			resp := &pb.OriginResponse{Status: status} //nolint:staticcheck
+			resp := &pb.OriginResponse{Status: status}                            //nolint:staticcheck
 			if provData, ok := data.(*pb.OriginResponse); ok && provData != nil { //nolint:staticcheck
 				resp.Purls = provData.Purls
 			}
@@ -382,13 +369,10 @@ func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *commo
 func (p provenanceServer) GetOriginByComponents(ctx context.Context, request *common.ComponentsRequest) (*pb.ComponentsOriginResponse, error) {
 	result := handleComponentsRequest[*pb.ComponentsOriginResponse](ctx, request,
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
-			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
-			if err != nil {
-				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
-			}
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
+			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
 			response, err := toComponentsOriginResponse(data)
-			return response, summary, err
+			return response, err
 		},
 		// Response mapping - type-safe and clear
 		func(data interface{}, status *common.StatusResponse) *pb.ComponentsOriginResponse {
@@ -409,13 +393,10 @@ func (p provenanceServer) GetOriginByComponents(ctx context.Context, request *co
 func (p provenanceServer) GetOriginByComponent(ctx context.Context, request *common.ComponentRequest) (*pb.ComponentOriginResponse, error) {
 	result := handleComponentRequest[*pb.ComponentOriginResponse](ctx, request,
 		// Component contributors use case call
-		func(ctx context.Context, s *zap.SugaredLogger, dto []dtos.ComponentDTO) (interface{}, models.QuerySummary, error) {
-			data, summary, err := p.originUseCase.GetOrigin(ctx, s, dto)
-			if err != nil {
-				return nil, summary, se.NewNotFoundError("provenance data extraction failed")
-			}
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (interface{}, error) {
+			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
 			response, err := toComponentOriginResponse(data)
-			return response, summary, err
+			return response, err
 		},
 		// Response mapping - type-safe and clear
 		func(data interface{}, status *common.StatusResponse) *pb.ComponentOriginResponse {

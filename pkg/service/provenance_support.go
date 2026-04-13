@@ -19,6 +19,8 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"github.com/scanoss/go-component-helper/componenthelper"
+	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	se "scanoss.com/provenance/pkg/errors"
 
 	common "github.com/scanoss/papi/api/commonv2"
@@ -29,97 +31,121 @@ import (
 )
 
 // convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
-func convertProvenanceInput(request *common.PurlRequest) ([]dtos.ComponentDTO, error) { //nolint:staticcheck
+func convertProvenanceInput(request *common.PurlRequest) []componenthelper.ComponentDTO { //nolint:staticcheck
 	if (request.Purls == nil) || (len(request.Purls) == 0) {
-		return []dtos.ComponentDTO{}, se.NewBadRequestError("No components supplied. At least one component should be supplied", nil)
+		return []componenthelper.ComponentDTO{}
 	}
-	var componentDTOS = []dtos.ComponentDTO{}
-	var emptyPurl []string
+	var componentDTOS []componenthelper.ComponentDTO
 	for _, c := range request.Purls {
 		if c.Purl == "" {
-			emptyPurl = append(emptyPurl, c.Purl)
 			continue
 		}
-		componentDTOS = append(componentDTOS, dtos.ComponentDTO{
+		componentDTOS = append(componentDTOS, componenthelper.ComponentDTO{
 			Purl:        c.Purl,
 			Requirement: c.Requirement,
 		})
 	}
-	if len(emptyPurl) > len(componentDTOS) {
-		return []dtos.ComponentDTO{}, se.NewBadRequestError("Empty purl supplied. At least one component should be supplied", nil)
-	}
-	return componentDTOS, nil
+	return componentDTOS
 }
 
 // convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
 func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput) (*pb.ContributorResponse, error) { //nolint:staticcheck
-	data, err := json.Marshal(output)
-	if err != nil {
-		s.Errorf("Problem marshalling Provenance request output: %v", err)
-		return &pb.ContributorResponse{}, errors.New("problem marshalling Provenance output") //nolint:staticcheck
+	response := pb.ContributorResponse{} //nolint:staticcheck
+	for _, p := range output.Provenance {
+		curatedData, err := json.Marshal(p.CuratedLocations)
+		if err != nil {
+			s.Errorf("Problem marshalling curated locations for %s: %v", p.Purl, err)
+			return &pb.ContributorResponse{}, errors.New("problem marshalling curated locations") //nolint:staticcheck
+		}
+		var curatedLocations []*pb.CuratedLocation
+		err = json.Unmarshal(curatedData, &curatedLocations)
+		if err != nil {
+			s.Errorf("Problem unmarshalling curated locations for %s: %v", p.Purl, err)
+			return &pb.ContributorResponse{}, errors.New("problem unmarshalling curated locations") //nolint:staticcheck
+		}
+
+		declaredData, err := json.Marshal(p.DeclaredLocations)
+		if err != nil {
+			s.Errorf("Problem marshalling declared locations for %s: %v", p.Purl, err)
+			return &pb.ContributorResponse{}, errors.New("problem marshalling declared locations") //nolint:staticcheck
+		}
+		var declaredLocations []*pb.DeclaredLocation
+		err = json.Unmarshal(declaredData, &declaredLocations)
+		if err != nil {
+			s.Errorf("Problem unmarshalling declared locations for %s: %v", p.Purl, err)
+			return &pb.ContributorResponse{}, errors.New("problem unmarshalling declared locations") //nolint:staticcheck
+		}
+		contributorsResponse := &pb.ContributorResponse_Purls{ //nolint:staticcheck
+			Purl:              p.Purl,
+			DeclaredLocations: declaredLocations,
+			CuratedLocations:  curatedLocations,
+		}
+		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
+			contributorsResponse.ErrorMessage = &p.Status.Message
+			contributorsResponse.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+		}
+		response.Purls = append(response.Purls, contributorsResponse)
 	}
-	//zlog.S.Debugf("Parsed data: %v", string(data))
-	var depResp pb.ContributorResponse //nolint:staticcheck
-	err = json.Unmarshal(data, &depResp)
-	if err != nil {
-		s.Errorf("Problem unmarshalling Provenance request output: %v", err)
-		return &pb.ContributorResponse{}, errors.New("problem unmarshalling Provenance output") //nolint:staticcheck
-	}
-	return &depResp, nil
+	return &response, nil
 }
 
-// convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
+// convertOriginOutput converts an internal Provenance Output structure into a Provenance Response struct
 func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.OriginResponse, error) { //nolint:staticcheck
-	data, err := json.Marshal(output)
-	if err != nil {
-		s.Errorf("Problem marshalling Provenance request output: %v", err)
-		return &pb.OriginResponse{}, errors.New("problem marshalling Provenance output") //nolint:staticcheck
+	response := pb.OriginResponse{} //nolint:staticcheck
+	for _, p := range output.Provenance {
+		data, err := json.Marshal(p.Countries)
+		if err != nil {
+			s.Errorf("Problem marshalling origin country info for %s: %v", p.Purl, err)
+			return &pb.OriginResponse{}, errors.New("problem marshalling origin country info") //nolint:staticcheck
+		}
+		var locations []*pb.Location
+		err = json.Unmarshal(data, &locations)
+		if err != nil {
+			s.Errorf("Problem unmarshalling origin country info for %s: %v", p.Purl, err)
+			return &pb.OriginResponse{}, errors.New("problem unmarshalling origin country info") //nolint:staticcheck
+		}
+		originResponse := &pb.OriginResponse_Purls{ //nolint:staticcheck
+			Purl:      p.Purl,
+			Locations: locations,
+		}
+		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
+			originResponse.ErrorMessage = &p.Status.Message
+			originResponse.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+		}
+		response.Purls = append(response.Purls, originResponse)
 	}
-	//zlog.S.Debugf("Parsed data: %v", string(data))
-	var depResp pb.OriginResponse //nolint:staticcheck
-	err = json.Unmarshal(data, &depResp)
-	if err != nil {
-		s.Errorf("Problem unmarshalling Provenance request output: %v", err)
-		return &pb.OriginResponse{}, errors.New("problem unmarshalling Provenance output") //nolint:staticcheck
-	}
-	return &depResp, nil
+	return &response, nil
 }
 
 // componentsRequestToDTO converts a components request into an internal ComponentDTO
-func componentsRequestToDTO(request *common.ComponentsRequest) ([]dtos.ComponentDTO, error) {
+func componentsRequestToDTO(request *common.ComponentsRequest) []componenthelper.ComponentDTO {
 	if (request.Components == nil) || (len(request.Components) == 0) {
-		return []dtos.ComponentDTO{}, se.NewBadRequestError("No components supplied. At least one component should be supplied", nil)
+		return []componenthelper.ComponentDTO{}
 	}
-	var componentDTOS = []dtos.ComponentDTO{}
-	var emptyPurl []string
+	var componentDTOS []componenthelper.ComponentDTO
 	for _, c := range request.Components {
 		if c.Purl == "" {
-			emptyPurl = append(emptyPurl, c.Purl)
 			continue
 		}
-		componentDTOS = append(componentDTOS, dtos.ComponentDTO{
+		componentDTOS = append(componentDTOS, componenthelper.ComponentDTO{
 			Purl:        c.Purl,
 			Requirement: c.Requirement,
 		})
 	}
-	if len(emptyPurl) > len(componentDTOS) {
-		return []dtos.ComponentDTO{}, se.NewBadRequestError("Empty purl supplied. At least one component should be supplied", nil)
-	}
-	return componentDTOS, nil
+	return componentDTOS
 }
 
 // componentRequestToDTO converts a component request into an internal ComponentDTO
-func componentRequestToDTO(request *common.ComponentRequest) ([]dtos.ComponentDTO, error) {
+func componentRequestToDTO(request *common.ComponentRequest) []componenthelper.ComponentDTO {
 	if request == nil || request.Purl == "" {
-		return []dtos.ComponentDTO{}, se.NewBadRequestError("No component supplied. A component needs to be supplied", nil)
+		return []componenthelper.ComponentDTO{}
 	}
-	var componentDTOS = []dtos.ComponentDTO{}
-	componentDTOS = append(componentDTOS, dtos.ComponentDTO{
-		Purl:        request.Purl,
-		Requirement: request.Requirement,
-	})
-
-	return componentDTOS, nil
+	return []componenthelper.ComponentDTO{
+		{
+			Purl:        request.Purl,
+			Requirement: request.Requirement,
+		},
+	}
 }
 
 // toComponentsContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
@@ -128,27 +154,37 @@ func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.Componen
 		ComponentsLocations: make([]*pb.ComponentLocationInfo, len(output.Provenance)),
 	}
 	for i, p := range output.Provenance {
-		curatedLocations := []*pb.CuratedLocation{}
-		for _, c := range p.CuratedLocations {
-			curatedLocations = append(curatedLocations, &pb.CuratedLocation{
-				Country: c.Country,
-				Count:   int32(c.Count),
-			})
+		curatedData, err := json.Marshal(p.CuratedLocations)
+		if err != nil {
+			return &pb.ComponentsContributorResponse{}, errors.New("problem marshalling curated locations")
+		}
+		var curatedLocations []*pb.CuratedLocation
+		err = json.Unmarshal(curatedData, &curatedLocations)
+		if err != nil {
+			return &pb.ComponentsContributorResponse{}, errors.New("problem unmarshalling curated locations")
 		}
 
-		declaredLocations := []*pb.DeclaredLocation{}
-		for _, d := range p.DeclaredLocations {
-			declaredLocations = append(declaredLocations, &pb.DeclaredLocation{
-				Type:     d.Type,
-				Location: d.Location,
-			})
+		declaredData, err := json.Marshal(p.DeclaredLocations)
+		if err != nil {
+			return &pb.ComponentsContributorResponse{}, errors.New("problem marshalling declared locations")
+		}
+		var declaredLocations []*pb.DeclaredLocation
+		err = json.Unmarshal(declaredData, &declaredLocations)
+		if err != nil {
+			return &pb.ComponentsContributorResponse{}, errors.New("problem unmarshalling declared locations")
 		}
 
-		response.ComponentsLocations[i] = &pb.ComponentLocationInfo{
+		componentLocation := &pb.ComponentLocationInfo{
 			Purl:              p.Purl,
 			CuratedLocations:  curatedLocations,
 			DeclaredLocations: declaredLocations,
 		}
+		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
+			componentLocation.ErrorMessage = &p.Status.Message
+			componentLocation.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+		}
+
+		response.ComponentsLocations[i] = componentLocation
 	}
 	return &response, nil
 }
@@ -174,17 +210,24 @@ func toComponentsOriginResponse(output dtos.OriginOutput) (*pb.ComponentsOriginR
 		ComponentsLocations: make([]*pb.ComponentLocation, len(output.Provenance)),
 	}
 	for i, p := range output.Provenance {
-		locations := []*pb.Location{}
-		for _, c := range p.Countries {
-			locations = append(locations, &pb.Location{
-				Name:       c.Name,
-				Percentage: float32(c.Percentage),
-			})
+		data, err := json.Marshal(p.Countries)
+		if err != nil {
+			return &pb.ComponentsOriginResponse{}, errors.New("problem marshalling origin country info")
 		}
-		response.ComponentsLocations[i] = &pb.ComponentLocation{
+		var locations []*pb.Location
+		err = json.Unmarshal(data, &locations)
+		if err != nil {
+			return &pb.ComponentsOriginResponse{}, errors.New("problem unmarshalling origin country info")
+		}
+		componentLocation := &pb.ComponentLocation{
 			Purl:      p.Purl,
 			Locations: locations,
 		}
+		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
+			componentLocation.ErrorMessage = &p.Status.Message
+			componentLocation.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+		}
+		response.ComponentsLocations[i] = componentLocation
 	}
 	return &response, nil
 }

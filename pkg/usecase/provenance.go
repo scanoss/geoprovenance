@@ -18,15 +18,14 @@ package usecase
 
 import (
 	"context"
-	"scanoss.com/provenance/pkg/errors"
-	"strconv"
-	"strings"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/scanoss/go-component-helper/componenthelper"
+	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	"go.uber.org/zap"
 	"scanoss.com/provenance/pkg/dtos"
+	"scanoss.com/provenance/pkg/errors"
 	"scanoss.com/provenance/pkg/models"
-	"scanoss.com/provenance/pkg/utils"
+	"strconv"
 )
 
 type ProvenanceUseCase struct {
@@ -65,32 +64,38 @@ func NewProvenance(db *sqlx.DB) *ProvenanceUseCase {
 }
 
 // GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
-func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogger, components []dtos.ComponentDTO) (dtos.ProvenanceOutput, models.QuerySummary, error) {
+func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogger, components []componenthelper.ComponentDTO) (dtos.ProvenanceOutput, error) {
+	validComponents := make([]componenthelper.Component, 0)
+	purlNames := make([]string, 0)
+	retV := dtos.ProvenanceOutput{}
+	sanitizedComponents := componenthelper.GetComponentsVersion(componenthelper.ComponentVersionCfg{
+		MaxWorkers: 5,
+		DB:         p.db,
+		Ctx:        ctx,
+		S:          s,
+		Input:      components,
+	})
 
-	summary := models.QuerySummary{}
-	summary.TotalPurls = len(components)
-	var purls []string
-	//Prepare purls to query
-	for _, component := range components {
-		purlName, err := utils.PurlNameFromString(component.Purl) // Make sure we just have the bare minimum for a Purl Name
-		if err == nil {
-			// to avoid SQL Injection
-			purlName = strings.ReplaceAll(purlName, "'", "")
-			purlName = strings.ReplaceAll(purlName, "\"", "")
-			purls = append(purls, purlName)
+	for _, component := range sanitizedComponents {
+		if component.Status.StatusCode != domain.VersionNotFound {
+			validComponents = append(validComponents, component)
+			purlNames = append(purlNames, component.Name)
 		} else {
-			summary.PurlsFailedToParse = append(summary.PurlsFailedToParse, component.Purl)
+			retV.Provenance = append(retV.Provenance, dtos.ProvenanceOutputItem{
+				Purl:   component.Purl,
+				Status: component.Status,
+			})
 		}
 	}
 
-	vendors, err := p.provenanceModel.GetProvenanceByPurlNames(ctx, s, purls)
-	if err != nil {
-		return dtos.ProvenanceOutput{}, models.QuerySummary{}, err
+	tooMany, err2many := p.provenanceModel.GetTooManyContributors(ctx, s, purlNames)
+	if err2many != nil {
+		return dtos.ProvenanceOutput{}, err2many
 	}
 
-	tooMany, err2many := p.provenanceModel.GetTooManyContributors(ctx, s, purls)
-	if err2many != nil {
-		return dtos.ProvenanceOutput{}, models.QuerySummary{}, err2many
+	vendors, err := p.provenanceModel.GetProvenanceByPurlNames(ctx, s, purlNames)
+	if err != nil {
+		return dtos.ProvenanceOutput{}, err
 	}
 
 	curatedCountries := p.provenanceModel.ProcessCuratedVendors(vendors)
@@ -100,33 +105,22 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		vendorsMap[v.PurlName] = append(vendorsMap[v.PurlName], v)
 	}
 
-	for _, component := range components {
-
-		purlName, err := utils.PurlNameFromString(component.Purl) // Make sure we just have the bare minimum for a Purl Name
-		if err == nil {
-			if !(len(vendorsMap[purlName]) > 0) && !existPurl(summary.PurlsFailedToParse, component.Purl) {
-				summary.PurlsWOInfo = append(summary.PurlsWOInfo, component.Purl)
-			}
-			if existPurl(tooMany, purlName) {
-				summary.PurlsTooMuchData = append(summary.PurlsTooMuchData, component.Purl)
-			}
-		}
-	}
-
-	retV := dtos.ProvenanceOutput{}
-
 	//Create the response
-
-	for _, component := range components {
-		purlName, err := utils.PurlNameFromString(component.Purl)
-		if err != nil {
-			continue
-		}
-		listOfVendors := vendorsMap[purlName]
-
+	for _, c := range validComponents {
 		var provOutItem dtos.ProvenanceOutputItem
 
-		provOutItem.Purl = component.Purl
+		if !(len(vendorsMap[c.Name]) > 0) {
+			provOutItem.Status = domain.ComponentStatus{
+				StatusCode: domain.ComponentWithoutInfo,
+				Message:    "No Provenance data found for the given Purl",
+			}
+			retV.Provenance = append(retV.Provenance, provOutItem)
+			continue
+		}
+
+		listOfVendors := vendorsMap[c.Name]
+
+		provOutItem.Purl = c.OriginalPurl
 		for _, vendor := range listOfVendors {
 			if vendor.DeclaredLocation != "" {
 				provOutItem.DeclaredLocations = append(provOutItem.DeclaredLocations, dtos.DeclaredProvenanceItem{Type: vendor.Type, Location: vendor.DeclaredLocation})
@@ -134,7 +128,7 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		}
 
 		//add curated values
-		for k, v := range curatedCountries[purlName] {
+		for k, v := range curatedCountries[c.Name] {
 			i, err := strconv.Atoi(k)
 			if err == nil {
 				countryName, err := p.countryMapModel.GetCountryById(ctx, s, i)
@@ -144,11 +138,17 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 			}
 		}
 
+		if existPurl(tooMany, c.Name) {
+			msg := "Too many contributors for " + c.OriginalPurl
+			provOutItem.Status.Message = msg
+			provOutItem.Status.StatusCode = domain.TooManyContributors
+		}
+
 		retV.Provenance = append(retV.Provenance, provOutItem)
 
 	}
 	if len(retV.Provenance) == 0 {
-		return dtos.ProvenanceOutput{}, models.QuerySummary{}, errors.NewNotFoundError("No Provenance data found for the given Purl(s)")
+		return dtos.ProvenanceOutput{}, errors.NewNotFoundError("No Provenance data found for the given Purl(s)")
 	}
-	return retV, summary, nil
+	return retV, nil
 }

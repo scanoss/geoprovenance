@@ -25,8 +25,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite/lib"
+	"github.com/scanoss/go-component-helper/componenthelper"
 	myconfig "scanoss.com/provenance/pkg/config"
-	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
@@ -75,7 +75,7 @@ func TestOriginUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
-	componentDTOS := []dtos.ComponentDTO{
+	componentDTOS := []componenthelper.ComponentDTO{
 		{
 			Purl:        "pkg:github/scanoss/engine",
 			Requirement: "5.2.4",
@@ -97,7 +97,7 @@ func TestOriginUseCase(t *testing.T) {
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v, %+v\n", countries, notFound)
-	componentDTOS = []dtos.ComponentDTO{
+	componentDTOS = []componenthelper.ComponentDTO{
 		{
 			Purl: "pkg:npm/",
 		},
