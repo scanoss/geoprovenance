@@ -5,6 +5,24 @@ Two endpoints are available for this.
 - Based on declared and human curated location
 - Based on calculations of the user data (commits, history, timezone,name)
 
+## [Unreleased]
+## [0.3.0] - 2026-04-14
+### Changed
+- Integrated `go-component-helper` for component handling
+- Simplified `provenance_service.go` gRPC handler pipeline with a single generic `runPipeline`
+- Updated dependencies to the latest versions
+### Added
+- Added per-component status on batch responses
+### Fixed
+- Return a bad request error when requests contain no PURLs or only empty PURLs
+### Refactored
+- Simplified provenance service logic and improved handling of bad requests
+### Removed
+- Obsolete `response_handler` and `purl` tests and dead helper code
+### Chore
+- Resolved staticcheck/linter issues across the codebase (package comments, doc style, initialism renames)
+- Bumped `golangci-lint` to v2.10.1 and modernized GitHub Actions to `setup-go@v5` using `go.mod`
+
 ## [0.2.0] - 2025-09-23
 ### Changed
 - Refactored geo provenance service core architecture
@@ -63,6 +81,7 @@ Two endpoints are available for this.
 ### Added
 - Added Dockerfile EXPOSE port
 
+[0.3.0]: https://github.com/scanoss/geoprovenance/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/scanoss/geoprovenance/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/scanoss/geoprovenance/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/scanoss/geoprovenance/compare/v0.1.0...v0.1.1

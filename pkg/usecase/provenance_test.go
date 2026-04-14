@@ -25,8 +25,9 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
+	"github.com/scanoss/go-component-helper/componenthelper"
+	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	myconfig "scanoss.com/provenance/pkg/config"
-	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
@@ -52,11 +53,11 @@ func TestProvenanceUseCase(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer models.CloseConn(conn)
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
-	componentDTOS := []dtos.ComponentDTO{
+	componentDTOS := []componenthelper.ComponentDTO{
 		{
 			Purl:        "pkg:github/scanoss/engine",
 			Requirement: "5.2.4",
@@ -69,7 +70,7 @@ func TestProvenanceUseCase(t *testing.T) {
 	}
 	provUc := NewProvenance(db)
 
-	countries, notFound, err := provUc.GetProvenance(ctx, s, componentDTOS)
+	countries, err := provUc.GetProvenance(ctx, s, componentDTOS)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
@@ -78,20 +79,27 @@ func TestProvenanceUseCase(t *testing.T) {
 
 	}
 	//fmt.Println(countries)
-	fmt.Printf("Provenance response: %+v, %+v\n", countries, notFound)
-	componentDTOS = []dtos.ComponentDTO{
+	fmt.Printf("Provenance response: %+v\n", countries)
+	componentDTOS = []componenthelper.ComponentDTO{
 		{
 			Purl: "pkg:npm/",
 		},
 	}
-	countries, _, err = provUc.GetProvenance(ctx, s, componentDTOS)
+	countries, err = provUc.GetProvenance(ctx, s, componentDTOS)
 
-	if err == nil && len(countries.Provenance) > 0 {
-		t.Fatalf("did not get an expected error: %v", countries)
+	if err == nil {
+		if len(countries.Provenance) == 0 {
+			t.Fatalf("expected at least one item with failure status, got: %v", countries)
+		}
+		for _, item := range countries.Provenance {
+			if item.Status.StatusCode == "" || item.Status.StatusCode == domain.Success {
+				t.Fatalf("expected non-success status for invalid purl, got: %v", item.Status)
+			}
+		}
 	}
 
-	componentDTOS = []dtos.ComponentDTO{}
-	countries, _, err = provUc.GetProvenance(ctx, s, componentDTOS)
+	componentDTOS = []componenthelper.ComponentDTO{}
+	countries, err = provUc.GetProvenance(ctx, s, componentDTOS)
 	if err == nil {
 		t.Fatalf("Not found error was expected")
 	}

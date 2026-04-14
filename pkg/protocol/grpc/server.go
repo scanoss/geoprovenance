@@ -22,10 +22,8 @@ import (
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/otel"
 	gs "github.com/scanoss/go-grpc-helper/pkg/grpc/server"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
-
-	myconfig "scanoss.com/provenance/pkg/config"
-
 	"google.golang.org/grpc"
+	myconfig "scanoss.com/provenance/pkg/config"
 )
 
 // RunServer runs gRPC service to publish.

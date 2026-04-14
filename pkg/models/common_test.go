@@ -29,19 +29,19 @@ func TestDbLoad(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	err = loadSqlData(db, nil, nil, "./tests/countries.sql")
+	err = loadSQLData(db, nil, nil, "./tests/countries.sql")
 	if err != nil {
 		t.Errorf("failed to load SQL test data: %v", err)
 	}
-	err = LoadTestSqlData(db, nil, nil)
+	err = LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Errorf("failed to load SQL test data: %v", err)
 	}
-	err = loadSqlData(db, nil, nil, "./tests/does-not-exist.sql")
+	err = loadSQLData(db, nil, nil, "./tests/does-not-exist.sql")
 	if err == nil {
 		t.Errorf("did not fail to load SQL test data")
 	}
-	err = loadTestSqlDataFiles(db, nil, nil, []string{"./tests/does-not-exist.sql"})
+	err = loadTestSQLDataFiles(db, nil, nil, []string{"./tests/does-not-exist.sql"})
 	if err == nil {
 		t.Errorf("did not fail to load SQL test data")
 	}

@@ -27,12 +27,25 @@ import (
 	"github.com/jmoiron/sqlx"
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
 	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
+
+type fakeServerTransportStream struct{}
+
+func (*fakeServerTransportStream) Method() string               { return "" }
+func (*fakeServerTransportStream) SetHeader(metadata.MD) error  { return nil }
+func (*fakeServerTransportStream) SendHeader(metadata.MD) error { return nil }
+func (*fakeServerTransportStream) SetTrailer(metadata.MD) error { return nil }
+
+func withFakeStream(ctx context.Context) context.Context {
+	return grpc.NewContextWithServerTransportStream(ctx, &fakeServerTransportStream{})
+}
 
 func TestCProvenanceServer_Echo(t *testing.T) {
 	ctx := context.Background()
@@ -100,8 +113,9 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -164,9 +178,15 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 			name:    "Should_ReturnSucceedWithWarning_FailedToParse",
 			request: `{"Purls":[ {"Purl":"pk:github/scanoss/engine"} ]}`,
 			expectedResponse: dtos.ProvenanceOutput{
-				Provenance: []dtos.ProvenanceOutputItem{},
+				Provenance: []dtos.ProvenanceOutputItem{
+					{
+						Purl:              "pk:github/scanoss/engine",
+						DeclaredLocations: []dtos.DeclaredProvenanceItem{},
+						CuratedLocations:  []dtos.CuratedProvenanceItem{},
+					},
+				},
 			},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:    "Should_ReturnSucceed",
@@ -203,23 +223,29 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 				t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
 			}
 
-			for i, item := range rcv.Provenance {
-				if item.Purl != tt.expectedResponse.Provenance[i].Purl {
+			expectedByPurl := make(map[string]dtos.ProvenanceOutputItem, len(tt.expectedResponse.Provenance))
+			for _, e := range tt.expectedResponse.Provenance {
+				expectedByPurl[e.Purl] = e
+			}
+			for _, item := range rcv.Provenance {
+				expected, ok := expectedByPurl[item.Purl]
+				if !ok {
+					t.Errorf("service.GetOrigin() unexpected purl %q in %v", item.Purl, rcv)
+					continue
+				}
+				if len(item.DeclaredLocations) != len(expected.DeclaredLocations) {
 					t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
 				}
-				if len(item.DeclaredLocations) != len(tt.expectedResponse.Provenance[i].DeclaredLocations) {
-					t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
-				}
-				if len(item.CuratedLocations) != len(tt.expectedResponse.Provenance[i].CuratedLocations) {
+				if len(item.CuratedLocations) != len(expected.CuratedLocations) {
 					t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
 				}
 				for j, declaredLocation := range item.DeclaredLocations {
-					if declaredLocation.Type != tt.expectedResponse.Provenance[i].DeclaredLocations[j].Type {
+					if declaredLocation.Type != expected.DeclaredLocations[j].Type {
 						t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
 					}
 				}
 				for j, curatedLocation := range item.CuratedLocations {
-					if curatedLocation.Country != tt.expectedResponse.Provenance[i].CuratedLocations[j].Country {
+					if curatedLocation.Country != expected.CuratedLocations[j].Country {
 						t.Errorf("service.GetOrigin() = %v, want %v", rcv, tt.expectedResponse)
 					}
 				}
@@ -247,13 +273,21 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 
 	} else {
 		fmt.Printf("%+v\n", rcv)
-		firstPurl := rcv.Provenance[0]
-		if len(firstPurl.DeclaredLocations) == 0 {
+		var enginePurl *dtos.ProvenanceOutputItem
+		for i := range rcv.Provenance {
+			if rcv.Provenance[i].Purl == "pkg:github/scanoss/engine" {
+				enginePurl = &rcv.Provenance[i]
+				break
+			}
+		}
+		if enginePurl == nil {
+			t.Error("expected to find pkg:github/scanoss/engine in response")
+		} else if len(enginePurl.DeclaredLocations) == 0 {
 			t.Error("expected to get at least 1 declared location")
-		} else if len(firstPurl.CuratedLocations) == 0 {
+		} else if len(enginePurl.CuratedLocations) == 0 {
 			t.Error("expected to get at least 1 curated location")
 		} else {
-			firstCuratedCountry := firstPurl.CuratedLocations[0]
+			firstCuratedCountry := enginePurl.CuratedLocations[0]
 			if firstCuratedCountry.Country != "Argentina" && firstCuratedCountry.Country != "Spain" && firstCuratedCountry.Country != "Afghanistan" {
 				t.Errorf("Curated country (%s) was not expected", firstCuratedCountry.Country)
 			}
@@ -275,8 +309,9 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -307,7 +342,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 				},
 			},
 			expectedResponse: &pb.ComponentsContributorResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -321,7 +356,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 				},
 			},
 			expectedResponse: &pb.ComponentsContributorResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -367,8 +402,9 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -392,7 +428,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 				Purl: "pkg:github/torvalds/uemacs",
 			},
 			expectedResponse: &pb.ComponentContributorResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -402,7 +438,7 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 				Purl: "pkg:github/scanoss/engines",
 			},
 			expectedResponse: &pb.ComponentContributorResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -444,8 +480,9 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -476,7 +513,7 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 				},
 			},
 			expectedResponse: &pb.ComponentsOriginResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_SUCCEEDED_WITH_WARNINGS},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -490,7 +527,7 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 				},
 			},
 			expectedResponse: &pb.ComponentsOriginResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -536,8 +573,9 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -561,7 +599,7 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 				Purl: "pkg:github/torvalds/uemacs",
 			},
 			expectedResponse: &pb.ComponentOriginResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -571,7 +609,7 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 				Purl: "pkg:github/scanoss/engines",
 			},
 			expectedResponse: &pb.ComponentOriginResponse{
-				Status: &common.StatusResponse{Status: common.StatusCode_FAILED},
+				Status: &common.StatusResponse{Status: common.StatusCode_SUCCESS},
 			},
 			expectError: false,
 		},
@@ -613,8 +651,9 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -666,7 +705,9 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 			name:    "Should_ReturnSucceedWithWarning_FailedToParse",
 			request: `{"Purls":[ {"Purl":"pk:github/scanoss/engine"} ]}`,
 			expectedResponse: dtos.OriginOutput{
-				Provenance: []dtos.OriginOutputItem{},
+				Provenance: []dtos.OriginOutputItem{
+					{Purl: "pk:github/scanoss/engine", Countries: []dtos.CountryInfo{}},
+				},
 			},
 			expectError: true,
 		},
@@ -674,7 +715,9 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 			name:    "Should_Failed_Not_Found",
 			request: `{"Purls":[ {"Purl":"pkg:github/scanoss/engines"} ]}`,
 			expectedResponse: dtos.OriginOutput{
-				Provenance: []dtos.OriginOutputItem{},
+				Provenance: []dtos.OriginOutputItem{
+					{Purl: "pkg:github/scanoss/engines", Countries: []dtos.CountryInfo{}},
+				},
 			},
 			expectError: true,
 		},

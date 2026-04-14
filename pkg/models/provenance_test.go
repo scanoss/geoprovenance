@@ -44,7 +44,7 @@ func TestContributorProvenance(t *testing.T) {
 	defer CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
 
-	err = LoadTestSqlData(db, nil, nil)
+	err = LoadTestSQLData(db, nil, nil)
 
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)

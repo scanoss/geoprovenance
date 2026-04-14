@@ -24,7 +24,7 @@ import (
 	"scanoss.com/provenance/pkg/cmd"
 )
 
-// main starts the gRPC provenance Service
+// main starts the gRPC provenance Service.
 func main() {
 	// Launch the Provenance Server Service
 	if err := cmd.RunServer(); err != nil {

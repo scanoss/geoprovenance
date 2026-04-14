@@ -33,7 +33,7 @@ type ProvenanceInputItem struct {
 	Requirement string `json:"requirement,omitempty"`
 }
 
-// ParseProvenanceInput converts the input byte array to a ProvenanceInput structure
+// ParseProvenanceInput converts the input byte array to a ProvenanceInput structure.
 func ParseProvenanceInput(s *zap.SugaredLogger, input []byte) (ProvenanceInput, error) {
 	if len(input) == 0 {
 		return ProvenanceInput{}, errors.New("no purl info data supplied to parse")
