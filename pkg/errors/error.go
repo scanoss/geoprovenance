@@ -14,17 +14,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Package errors provides structured service errors and helpers for mapping
+// them to gRPC/HTTP responses.
 package errors
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+
 	common "github.com/scanoss/papi/api/commonv2"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"net/http"
 )
 
 // ServiceError represents a service-level error with HTTP status mapping and additional context..

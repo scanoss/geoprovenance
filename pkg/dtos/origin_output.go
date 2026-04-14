@@ -14,6 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Package dtos defines the data transfer objects exchanged between the
+// service, use case, and model layers of the geo provenance service.
 package dtos
 
 import "github.com/scanoss/go-grpc-helper/pkg/grpc/domain"

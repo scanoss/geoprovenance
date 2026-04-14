@@ -18,6 +18,8 @@ package usecase
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
@@ -25,7 +27,6 @@ import (
 	"scanoss.com/provenance/pkg/dtos"
 	"scanoss.com/provenance/pkg/errors"
 	"scanoss.com/provenance/pkg/models"
-	"strconv"
 )
 
 type ProvenanceUseCase struct {
@@ -46,7 +47,6 @@ type InternalQuery struct {
 }
 
 func existPurl(purls []string, purl string) bool {
-
 	for _, r := range purls {
 		if purl == r {
 			return true
@@ -63,7 +63,7 @@ func NewProvenance(db *sqlx.DB) *ProvenanceUseCase {
 	}
 }
 
-// GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
+// GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct.
 func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogger, components []componenthelper.ComponentDTO) (dtos.ProvenanceOutput, error) {
 	validComponents := make([]componenthelper.Component, 0)
 	purlNames := make([]string, 0)
@@ -77,7 +77,8 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 	})
 
 	for _, component := range sanitizedComponents {
-		if component.Status.StatusCode != domain.VersionNotFound {
+		// Keep searching for components with  SUCCESS AND VERSION_NOT_FOUND status.
+		if component.Status.StatusCode == domain.VersionNotFound || component.Status.StatusCode == domain.Success {
 			validComponents = append(validComponents, component)
 			purlNames = append(purlNames, component.Name)
 		} else {
@@ -105,11 +106,11 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		vendorsMap[v.PurlName] = append(vendorsMap[v.PurlName], v)
 	}
 
-	//Create the response
+	// Create the response
 	for _, c := range validComponents {
 		var provOutItem dtos.ProvenanceOutputItem
 		provOutItem.Purl = c.OriginalPurl
-		if len(vendorsMap[c.Name]) <= 0 {
+		if len(vendorsMap[c.Name]) == 0 {
 			provOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Provenance data found for the given Purl",
@@ -126,12 +127,12 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 			}
 		}
 
-		//add curated values
+		// add curated values
 		for k, v := range curatedCountries[c.Name] {
-			i, err := strconv.Atoi(k)
-			if err == nil {
-				countryName, err := p.countryMapModel.GetCountryById(ctx, s, i)
-				if err == nil {
+			i, errAtoi := strconv.Atoi(k)
+			if errAtoi == nil {
+				countryName, errCountry := p.countryMapModel.GetCountryByID(ctx, s, i)
+				if errCountry == nil {
 					provOutItem.CuratedLocations = append(provOutItem.CuratedLocations, dtos.CuratedProvenanceItem{Country: countryName, Count: v})
 				}
 			}
@@ -144,7 +145,6 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		}
 
 		retV.Provenance = append(retV.Provenance, provOutItem)
-
 	}
 	if len(retV.Provenance) == 0 {
 		return dtos.ProvenanceOutput{}, errors.NewNotFoundError("No Provenance data found for the given Purl(s)")

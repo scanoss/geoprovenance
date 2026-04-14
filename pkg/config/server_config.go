@@ -26,7 +26,7 @@ const (
 	defaultRestPort = "40056"
 )
 
-// ServerConfig is configuration for Server
+// ServerConfig is configuration for Server.
 type ServerConfig struct {
 	App struct {
 		Name           string `env:"APP_NAME"`
@@ -70,7 +70,7 @@ type ServerConfig struct {
 	}
 }
 
-// NewServerConfig loads all config options and returns a struct for use
+// NewServerConfig loads all config options and returns a struct for use.
 func NewServerConfig(feeders []config.Feeder) (*ServerConfig, error) {
 	cfg := ServerConfig{}
 	setServerConfigDefaults(&cfg)
@@ -87,7 +87,7 @@ func NewServerConfig(feeders []config.Feeder) (*ServerConfig, error) {
 	return &cfg, nil
 }
 
-// setServerConfigDefaults attempts to set reasonable defaults for the server config
+// setServerConfigDefaults attempts to set reasonable defaults for the server config.
 func setServerConfigDefaults(cfg *ServerConfig) {
 	cfg.App.Name = "SCANOSS Geo Provenance Server"
 	cfg.App.GRPCPort = defaultGrpcPort

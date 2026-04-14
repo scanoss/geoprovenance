@@ -42,8 +42,8 @@ func RunServer(config *myconfig.ServerConfig, ctx context.Context, grpcPort, htt
 	go func() {
 		ctx2, cancel := context.WithCancel(ctx)
 		defer cancel()
-		if err := pb.RegisterGeoProvenanceHandlerFromEndpoint(ctx2, mux, grpcGateway, opts); err != nil {
-			zlog.S.Panicf("Failed to start HTTP gateway %v", err)
+		if registerErr := pb.RegisterGeoProvenanceHandlerFromEndpoint(ctx2, mux, grpcGateway, opts); registerErr != nil {
+			zlog.S.Panicf("Failed to start HTTP gateway %v", registerErr)
 		}
 		gw.StartGateway(srv, config.TLS.CertFile, config.TLS.KeyFile, startTLS)
 	}()

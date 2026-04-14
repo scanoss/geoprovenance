@@ -14,17 +14,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Package usecase contains the business logic for the geo provenance service,
+// orchestrating provenance and origin data for components.
 package usecase
 
 import (
 	"context"
 	"fmt"
-	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	"math"
 	_ "strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/scanoss/go-component-helper/componenthelper"
+	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	"go.uber.org/zap"
 	"scanoss.com/provenance/pkg/dtos"
 	"scanoss.com/provenance/pkg/models"
@@ -57,7 +59,8 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 	validComponents := make([]componenthelper.Component, 0)
 	purlNames := make([]string, 0)
 	for _, component := range sanitizedComponents {
-		if component.Status.StatusCode == domain.Success || component.Status.StatusCode != domain.VersionNotFound {
+		// Keep searching for components with  SUCCESS AND VERSION_NOT_FOUND status.
+		if component.Status.StatusCode == domain.Success || component.Status.StatusCode == domain.VersionNotFound {
 			validComponents = append(validComponents, component)
 			purlNames = append(purlNames, component.Name)
 		} else {
@@ -80,12 +83,11 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		tz, _ := p.provenanceModel.GetTimeZoneOriginByPurlName(ctx, s, c.Name)
 		for _, v := range tz {
 			if count, exist := mapOrigins[v.CountryName]; !exist {
-				mapOrigins[v.CountryName] = int16(v.ContributorCount)
-
+				mapOrigins[v.CountryName] = v.ContributorCount
 			} else {
-				mapOrigins[v.CountryName] = count + int16(v.ContributorCount)
+				mapOrigins[v.CountryName] = count + v.ContributorCount
 			}
-			mapTotal[c.Name] += int16(v.ContributorCount)
+			mapTotal[c.Name] += v.ContributorCount
 		}
 
 		for k, v := range mapOrigins {
@@ -94,7 +96,7 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		}
 	}
 
-	//Create the response
+	// Create the response
 	for _, c := range validComponents {
 		origins := resMaps[c.Name]
 		var origOutItem dtos.OriginOutputItem
@@ -119,7 +121,6 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 			origOutItem.Status.StatusCode = c.Status.StatusCode
 		}
 		retV.Provenance = append(retV.Provenance, origOutItem)
-
 	}
 
 	return retV, nil

@@ -14,6 +14,11 @@ Two endpoints are available for this.
 - Added per-component status on batch responses
 ### Refactored
 - Simplified provenance service logic and improved handling of bad requests
+### Removed
+- Obsolete `response_handler` and `purl` tests and dead helper code
+### Chore
+- Resolved staticcheck/linter issues across the codebase (package comments, doc style, initialism renames)
+- Bumped `golangci-lint` to v2.10.1 and modernized GitHub Actions to `setup-go@v5` using `go.mod`
 
 ## [0.2.0] - 2025-09-23
 ### Changed

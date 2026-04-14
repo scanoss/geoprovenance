@@ -53,7 +53,7 @@ func TestProvenanceUseCase(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer models.CloseConn(conn)
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}

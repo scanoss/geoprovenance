@@ -36,7 +36,7 @@ type Provenance struct {
 	PurlName         string `db:"purl_name"`
 	VendorName       string `db:"vendor_name"`
 	DeclaredLocation string `db:"declared_location"`
-	CountriesId      string `db:"countries_id"`
+	CountriesID      string `db:"countries_id"`
 }
 
 type Origin struct {
@@ -49,17 +49,17 @@ type LocationDistribution struct {
 	ContributorPercentage float32
 }
 
-// NewProvenanceModel creates a new instance of a provenance Model
+// NewProvenanceModel creates a new instance of a provenance Model.
 func NewProvenanceModel(db *sqlx.DB) *ProvenanceModel {
 	return &ProvenanceModel{db: db}
 }
 
-// ProcessCuratedVendors assigns a list of country name to given set of id's of a set of provenance records
+// ProcessCuratedVendors assigns a list of country name to given set of id's of a set of provenance records.
 func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string]map[string]int {
 	curatedCountries := make(map[string]map[string]int)
 	for _, v := range vendors {
-		if v.CountriesId != "" {
-			listStr := strings.ReplaceAll(v.CountriesId, "{", "")
+		if v.CountriesID != "" {
+			listStr := strings.ReplaceAll(v.CountriesID, "{", "")
 			listStr = strings.ReplaceAll(listStr, "}", "")
 			list := strings.Split(listStr, ",")
 			if len(list) == 0 {
@@ -75,7 +75,7 @@ func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string
 	return curatedCountries
 }
 
-// GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames
+// GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames.
 func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]Provenance, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
@@ -115,7 +115,7 @@ func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.S
 	return allSources, nil
 }
 
-// GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames
+// GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames.
 func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]string, error) {
 	list := ""
 	list = strings.Join(purlNames, "','")
@@ -136,7 +136,6 @@ func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.Sug
 }
 
 func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(ctx context.Context, s *zap.SugaredLogger, purlName string) ([]Origin, error) {
-
 	var allSources []Origin
 	query := `
 		SELECT

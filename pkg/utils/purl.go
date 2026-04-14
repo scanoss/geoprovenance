@@ -14,6 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Package utils provides helpers for parsing and manipulating PURLs and
+// related request inputs.
 package utils
 
 import (
@@ -28,7 +30,7 @@ import (
 var pkgRegex = regexp.MustCompile(`^pkg:(?P<type>\w+)/(?P<name>.+)$`) // regex to parse purl name from purl string
 var typeRegex = regexp.MustCompile(`^(npm|nuget)$`)                   // regex to parse purl types that should not be lower cased
 
-// PurlFromString takes an input Purl string and returns a decomposed structure of all the elements
+// PurlFromString takes an input Purl string and returns a decomposed structure of all the elements.
 func PurlFromString(purlString string) (packageurl.PackageURL, error) {
 	if len(purlString) == 0 {
 		return packageurl.PackageURL{}, errors.New("no Purl string specified to parse")
@@ -40,7 +42,7 @@ func PurlFromString(purlString string) (packageurl.PackageURL, error) {
 	return purl, nil
 }
 
-// PurlNameFromString take an input Purl string and return the Purl Name only
+// PurlNameFromString take an input Purl string and return the Purl Name only.
 func PurlNameFromString(purlString string) (string, error) {
 	if len(purlString) == 0 {
 		return "", fmt.Errorf("no purl string supplied to parse")
@@ -62,7 +64,7 @@ func PurlNameFromString(purlString string) (string, error) {
 	return "", fmt.Errorf("no purl name found in '%v'", purlString)
 }
 
-// ConvertPurlString takes an input PURL and checks to see if anything needs to be modified before search the KB
+// ConvertPurlString takes an input PURL and checks to see if anything needs to be modified before search the KB.
 func ConvertPurlString(purlString string) string {
 	// Replace Golang GitHub package reference with just GitHub
 	if len(purlString) > 0 && strings.HasPrefix(purlString, "pkg:golang/github.com/") {
@@ -74,29 +76,4 @@ func ConvertPurlString(purlString string) string {
 		return s
 	}
 	return purlString
-}
-
-// ProjectUrl returns a browsable URL for the given purl type and name
-func ProjectUrl(purlName, purlType string) (string, error) {
-	if len(purlName) == 0 {
-		return "", fmt.Errorf("no purl name supplied")
-	}
-	if len(purlType) == 0 {
-		return "", fmt.Errorf("no purl type supplied")
-	}
-	switch purlType {
-	case "github":
-		return fmt.Sprintf("https://github.com/%v", purlName), nil
-	case "npm":
-		return fmt.Sprintf("https://www.npmjs.com/package/%v", purlName), nil
-	case "maven":
-		return fmt.Sprintf("https://mvnrepository.com/artifact/%v", purlName), nil
-	case "gem":
-		return fmt.Sprintf("https://rubygems.org/gems/%v", purlName), nil
-	case "pypi":
-		return fmt.Sprintf("https://pypi.org/project/%v", purlName), nil
-	case "golang":
-		return fmt.Sprintf("https://pkg.go.dev/%v", purlName), nil
-	}
-	return "", fmt.Errorf("no url prefix found for '%v': %v", purlType, purlName)
 }

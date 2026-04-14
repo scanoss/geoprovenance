@@ -71,7 +71,7 @@ func TestOriginUseCase(t *testing.T) {
 	})
 	_ = sqliteConn
 	defer models.CloseConn(conn)
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
