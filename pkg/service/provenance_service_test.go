@@ -27,12 +27,25 @@ import (
 	"github.com/jmoiron/sqlx"
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
 	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
+
+type fakeServerTransportStream struct{}
+
+func (*fakeServerTransportStream) Method() string               { return "" }
+func (*fakeServerTransportStream) SetHeader(metadata.MD) error  { return nil }
+func (*fakeServerTransportStream) SendHeader(metadata.MD) error { return nil }
+func (*fakeServerTransportStream) SetTrailer(metadata.MD) error { return nil }
+
+func withFakeStream(ctx context.Context) context.Context {
+	return grpc.NewContextWithServerTransportStream(ctx, &fakeServerTransportStream{})
+}
 
 func TestCProvenanceServer_Echo(t *testing.T) {
 	ctx := context.Background()
@@ -100,8 +113,9 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -172,7 +186,7 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 					},
 				},
 			},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:    "Should_ReturnSucceed",
@@ -295,8 +309,9 @@ func TestCProvenanceServer_GetCountryContributorsByComponents(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -387,8 +402,9 @@ func TestCProvenanceServer_GetCountryContributorsByComponent(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -464,8 +480,9 @@ func TestCProvenanceServer_GetOriginByComponents(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -556,8 +573,9 @@ func TestCProvenanceServer_GetOriginByComponent(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -633,8 +651,9 @@ func TestProvenanceServer_GetOrigin(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 	ctx = ctxzap.ToContext(ctx, zlog.L)
+	ctx = withFakeStream(ctx)
 
-	err = models.LoadTestSqlData(db, nil, nil)
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 	}

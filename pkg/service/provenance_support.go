@@ -19,19 +19,18 @@ package service
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
-	se "scanoss.com/provenance/pkg/errors"
-
 	common "github.com/scanoss/papi/api/commonv2"
 	pb "github.com/scanoss/papi/api/geoprovenancev2"
-	"scanoss.com/provenance/pkg/dtos"
-
 	"go.uber.org/zap"
+	"scanoss.com/provenance/pkg/dtos"
+	se "scanoss.com/provenance/pkg/errors"
 )
 
-// convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
-func convertProvenanceInput(request *common.PurlRequest) ([]componenthelper.ComponentDTO, error) { //nolint:staticcheck
+// convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct.
+func convertProvenanceInput(request *common.PurlRequest) ([]componenthelper.ComponentDTO, error) {
 	if request == nil || len(request.Purls) == 0 {
 		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty purls provided", nil)
 	}
@@ -53,34 +52,34 @@ func convertProvenanceInput(request *common.PurlRequest) ([]componenthelper.Comp
 	return componentDTOS, nil
 }
 
-// convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
-func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput) (*pb.ContributorResponse, error) { //nolint:staticcheck
-	response := pb.ContributorResponse{} //nolint:staticcheck
+// convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct.
+func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput) (*pb.ContributorResponse, error) {
+	response := pb.ContributorResponse{}
 	for _, p := range output.Provenance {
 		curatedData, err := json.Marshal(p.CuratedLocations)
 		if err != nil {
 			s.Errorf("Problem marshalling curated locations for %s: %v", p.Purl, err)
-			return &pb.ContributorResponse{}, errors.New("problem marshalling curated locations") //nolint:staticcheck
+			return &pb.ContributorResponse{}, errors.New("problem marshalling curated locations")
 		}
 		var curatedLocations []*pb.CuratedLocation
 		err = json.Unmarshal(curatedData, &curatedLocations)
 		if err != nil {
 			s.Errorf("Problem unmarshalling curated locations for %s: %v", p.Purl, err)
-			return &pb.ContributorResponse{}, errors.New("problem unmarshalling curated locations") //nolint:staticcheck
+			return &pb.ContributorResponse{}, errors.New("problem unmarshalling curated locations")
 		}
 
 		declaredData, err := json.Marshal(p.DeclaredLocations)
 		if err != nil {
 			s.Errorf("Problem marshalling declared locations for %s: %v", p.Purl, err)
-			return &pb.ContributorResponse{}, errors.New("problem marshalling declared locations") //nolint:staticcheck
+			return &pb.ContributorResponse{}, errors.New("problem marshalling declared locations")
 		}
 		var declaredLocations []*pb.DeclaredLocation
 		err = json.Unmarshal(declaredData, &declaredLocations)
 		if err != nil {
 			s.Errorf("Problem unmarshalling declared locations for %s: %v", p.Purl, err)
-			return &pb.ContributorResponse{}, errors.New("problem unmarshalling declared locations") //nolint:staticcheck
+			return &pb.ContributorResponse{}, errors.New("problem unmarshalling declared locations")
 		}
-		contributorsResponse := &pb.ContributorResponse_Purls{ //nolint:staticcheck
+		contributorsResponse := &pb.ContributorResponse_Purls{
 			Purl:              p.Purl,
 			DeclaredLocations: declaredLocations,
 			CuratedLocations:  curatedLocations,
@@ -94,22 +93,22 @@ func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput)
 	return &response, nil
 }
 
-// convertOriginOutput converts an internal Provenance Output structure into a Provenance Response struct
-func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.OriginResponse, error) { //nolint:staticcheck
-	response := pb.OriginResponse{} //nolint:staticcheck
+// convertOriginOutput converts an internal Provenance Output structure into a Provenance Response struct.
+func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.OriginResponse, error) {
+	response := pb.OriginResponse{}
 	for _, p := range output.Provenance {
 		data, err := json.Marshal(p.Countries)
 		if err != nil {
 			s.Errorf("Problem marshalling origin country info for %s: %v", p.Purl, err)
-			return &pb.OriginResponse{}, errors.New("problem marshalling origin country info") //nolint:staticcheck
+			return &pb.OriginResponse{}, errors.New("problem marshalling origin country info")
 		}
 		var locations []*pb.Location
 		err = json.Unmarshal(data, &locations)
 		if err != nil {
 			s.Errorf("Problem unmarshalling origin country info for %s: %v", p.Purl, err)
-			return &pb.OriginResponse{}, errors.New("problem unmarshalling origin country info") //nolint:staticcheck
+			return &pb.OriginResponse{}, errors.New("problem unmarshalling origin country info")
 		}
-		originResponse := &pb.OriginResponse_Purls{ //nolint:staticcheck
+		originResponse := &pb.OriginResponse_Purls{
 			Purl:      p.Purl,
 			Locations: locations,
 		}
@@ -122,7 +121,7 @@ func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.Or
 	return &response, nil
 }
 
-// componentsRequestToDTO converts a components request into an internal ComponentDTO
+// componentsRequestToDTO converts a components request into an internal ComponentDTO.
 func componentsRequestToDTO(request *common.ComponentsRequest) ([]componenthelper.ComponentDTO, error) {
 	if len(request.Components) == 0 {
 		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty components provided", nil)
@@ -145,7 +144,7 @@ func componentsRequestToDTO(request *common.ComponentsRequest) ([]componenthelpe
 	return componentDTOS, nil
 }
 
-// componentRequestToDTO converts a component request into an internal ComponentDTO
+// componentRequestToDTO converts a component request into an internal ComponentDTO.
 func componentRequestToDTO(request *common.ComponentRequest) ([]componenthelper.ComponentDTO, error) {
 	if request == nil || request.Purl == "" {
 		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty component provided", nil)
@@ -158,7 +157,7 @@ func componentRequestToDTO(request *common.ComponentRequest) ([]componenthelper.
 	}, nil
 }
 
-// toComponentsContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
+// toComponentsContributorResponse converts an internal Provenance Output structure into a Provenance Response struct.
 func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.ComponentsContributorResponse, error) {
 	response := pb.ComponentsContributorResponse{
 		ComponentsLocations: make([]*pb.ComponentLocationInfo, len(output.Provenance)),
@@ -199,7 +198,7 @@ func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.Componen
 	return &response, nil
 }
 
-// toComponentContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
+// toComponentContributorResponse converts an internal Provenance Output structure into a Provenance Response struct.
 func toComponentContributorResponse(output dtos.ProvenanceOutput) (*pb.ComponentContributorResponse, error) {
 	response := pb.ComponentContributorResponse{
 		ComponentLocations: &pb.ComponentLocationInfo{},
@@ -214,7 +213,7 @@ func toComponentContributorResponse(output dtos.ProvenanceOutput) (*pb.Component
 	return &response, nil
 }
 
-// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct
+// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct.
 func toComponentsOriginResponse(output dtos.OriginOutput) (*pb.ComponentsOriginResponse, error) {
 	response := pb.ComponentsOriginResponse{
 		ComponentsLocations: make([]*pb.ComponentLocation, len(output.Provenance)),
@@ -242,7 +241,7 @@ func toComponentsOriginResponse(output dtos.OriginOutput) (*pb.ComponentsOriginR
 	return &response, nil
 }
 
-// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct
+// toComponentsOriginResponse converts an internal Provenance Output structure into a Provenance Response struct.
 func toComponentOriginResponse(output dtos.OriginOutput) (*pb.ComponentOriginResponse, error) {
 	response := pb.ComponentOriginResponse{
 		ComponentLocations: &pb.ComponentLocation{},

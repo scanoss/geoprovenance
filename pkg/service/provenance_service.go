@@ -90,21 +90,21 @@ func (p provenanceServer) Echo(ctx context.Context, request *common.EchoRequest)
 	return &common.EchoResponse{Message: request.GetMessage()}, nil
 }
 
-func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) { //nolint:staticcheck
+func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) {
 	return runPipeline(
 		ctx,
 		request,
 		convertProvenanceInput,
-		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.ContributorResponse, error) { //nolint:staticcheck
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.ContributorResponse, error) {
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			if err != nil {
 				return nil, err
 			}
 			return convertProvenanceOutput(s, data)
 		},
-		func(resp *pb.ContributorResponse, status *common.StatusResponse) *pb.ContributorResponse { //nolint:staticcheck
+		func(resp *pb.ContributorResponse, status *common.StatusResponse) *pb.ContributorResponse {
 			if resp == nil {
-				resp = &pb.ContributorResponse{} //nolint:staticcheck
+				resp = &pb.ContributorResponse{}
 			}
 			resp.Status = status
 			return resp
@@ -156,21 +156,21 @@ func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context,
 	), nil
 }
 
-func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) { //nolint:staticcheck
+func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) {
 	return runPipeline(
 		ctx,
 		request,
 		convertProvenanceInput,
-		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.OriginResponse, error) { //nolint:staticcheck
+		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.OriginResponse, error) {
 			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
 			if err != nil {
 				return nil, err
 			}
 			return convertOriginOutput(s, data)
 		},
-		func(resp *pb.OriginResponse, status *common.StatusResponse) *pb.OriginResponse { //nolint:staticcheck
+		func(resp *pb.OriginResponse, status *common.StatusResponse) *pb.OriginResponse {
 			if resp == nil {
-				resp = &pb.OriginResponse{} //nolint:staticcheck
+				resp = &pb.OriginResponse{}
 			}
 			resp.Status = status
 			return resp

@@ -12,6 +12,8 @@ Two endpoints are available for this.
 - Updated dependencies to the latest versions
 ### Added
 - Added per-component status on batch responses
+### Fixed
+- Return a bad request error when requests contain no PURLs or only empty PURLs
 ### Refactored
 - Simplified provenance service logic and improved handling of bad requests
 ### Removed
