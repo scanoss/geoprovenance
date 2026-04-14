@@ -6,6 +6,7 @@ Two endpoints are available for this.
 - Based on calculations of the user data (commits, history, timezone,name)
 
 ## [Unreleased]
+## [0.3.0] - 2026-04-14
 ### Changed
 - Integrated `go-component-helper` for component handling
 - Simplified `provenance_service.go` gRPC handler pipeline with a single generic `runPipeline`
@@ -80,6 +81,7 @@ Two endpoints are available for this.
 ### Added
 - Added Dockerfile EXPOSE port
 
+[0.3.0]: https://github.com/scanoss/geoprovenance/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/scanoss/geoprovenance/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/scanoss/geoprovenance/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/scanoss/geoprovenance/compare/v0.1.0...v0.1.1
