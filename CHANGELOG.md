@@ -12,6 +12,8 @@ Two endpoints are available for this.
 - Updated dependencies to the latest versions
 ### Added
 - Added per-component status on batch responses
+### Refactored
+- Simplified provenance service logic and improved handling of bad requests
 
 ## [0.2.0] - 2025-09-23
 ### Changed

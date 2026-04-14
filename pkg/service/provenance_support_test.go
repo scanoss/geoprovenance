@@ -60,7 +60,10 @@ func TestInputConvert(t *testing.T) {
 			},
 		},
 	}
-	input := convertProvenanceInput(provIn)
+	input, err := convertProvenanceInput(provIn)
+	if err != nil {
+		t.Errorf("TestInputConvert failed: %v", err)
+	}
 	fmt.Printf("Input: %v\n", input)
 }
 
@@ -147,8 +150,8 @@ func Test_convertProvenanceInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := convertProvenanceInput(tt.request)
-			if tt.expectError {
+			got, err := convertProvenanceInput(tt.request)
+			if tt.expectError && err == nil {
 				if len(got) != 0 {
 					t.Errorf("convertProvenanceInput() expected empty result but got %v", got)
 				}
@@ -296,8 +299,8 @@ func Test_componentsRequestToDTO(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := componentsRequestToDTO(tt.request)
-			if tt.expectError {
+			got, err := componentsRequestToDTO(tt.request)
+			if tt.expectError && err == nil {
 				if len(got) != 0 {
 					t.Errorf("componentsRequestToDTO() expected empty result but got %v", got)
 				}
@@ -331,6 +334,7 @@ func Test_componentRequestToDTO(t *testing.T) {
 			name:        "Nil request",
 			request:     nil,
 			expectError: true,
+			wantLen:     0,
 			errorMsg:    "No component supplied. A component needs to be supplied",
 		},
 		{
@@ -338,6 +342,7 @@ func Test_componentRequestToDTO(t *testing.T) {
 			request: &common.ComponentRequest{
 				Purl: "",
 			},
+			wantLen:     0,
 			expectError: true,
 			errorMsg:    "No component supplied. A component needs to be supplied",
 		},
@@ -353,18 +358,19 @@ func Test_componentRequestToDTO(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := componentRequestToDTO(tt.request)
-			if tt.expectError {
-				if len(got) != 0 {
-					t.Errorf("componentRequestToDTO() expected empty result but got %v", got)
-				}
+			got, err := componentRequestToDTO(tt.request)
+			if tt.expectError && err == nil {
+				t.Errorf("componentRequestToDTO() expected error but got %v", err)
 				return
 			}
 			if len(got) != tt.wantLen {
 				t.Errorf("componentRequestToDTO() len = %v, want %v", len(got), tt.wantLen)
+				return
 			}
-			if got[0].Purl != tt.request.Purl {
-				t.Errorf("componentRequestToDTO() purl = %v, want %v", got[0].Purl, tt.request.Purl)
+			if tt.request != nil {
+				if tt.request.Purl != "" && got[0].Purl != tt.request.Purl {
+					t.Errorf("componentRequestToDTO() purl = %v, want %v", got[0].Purl, tt.request.Purl)
+				}
 			}
 		})
 	}

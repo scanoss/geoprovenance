@@ -63,13 +63,17 @@ func NewProvenanceServer(db *sqlx.DB, config *myconfig.ServerConfig) pb.GeoProve
 func runPipeline[Req any, Data any, Resp any](
 	ctx context.Context,
 	req Req,
-	convert func(Req) []componenthelper.ComponentDTO,
+	convert func(Req) ([]componenthelper.ComponentDTO, error),
 	handle func(context.Context, *zap.SugaredLogger, []componenthelper.ComponentDTO) (Data, error),
 	build func(Data, *common.StatusResponse) Resp,
 ) Resp {
 	s := ctxzap.Extract(ctx).Sugar()
 	var zero Data
-	data, err := handle(ctx, s, convert(req))
+	dto, err := convert(req)
+	if err != nil {
+		return build(zero, se.HandleServiceError(ctx, s, err))
+	}
+	data, err := handle(ctx, s, dto)
 	if err != nil {
 		return build(zero, se.HandleServiceError(ctx, s, err))
 	}
@@ -87,7 +91,10 @@ func (p provenanceServer) Echo(ctx context.Context, request *common.EchoRequest)
 }
 
 func (p provenanceServer) GetComponentContributors(ctx context.Context, request *common.PurlRequest) (*pb.ContributorResponse, error) { //nolint:staticcheck
-	return runPipeline(ctx, request, convertProvenanceInput,
+	return runPipeline(
+		ctx,
+		request,
+		convertProvenanceInput,
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.ContributorResponse, error) { //nolint:staticcheck
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			if err != nil {
@@ -106,7 +113,10 @@ func (p provenanceServer) GetComponentContributors(ctx context.Context, request 
 }
 
 func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context, request *common.ComponentsRequest) (*pb.ComponentsContributorResponse, error) {
-	return runPipeline(ctx, request, componentsRequestToDTO,
+	return runPipeline(
+		ctx,
+		request,
+		componentsRequestToDTO,
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.ComponentsContributorResponse, error) {
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			if err != nil {
@@ -125,7 +135,10 @@ func (p provenanceServer) GetCountryContributorsByComponents(ctx context.Context
 }
 
 func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context, request *common.ComponentRequest) (*pb.ComponentContributorResponse, error) {
-	return runPipeline(ctx, request, componentRequestToDTO,
+	return runPipeline(
+		ctx,
+		request,
+		componentRequestToDTO,
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.ComponentContributorResponse, error) {
 			data, err := p.provenanceUseCase.GetProvenance(ctx, s, dto)
 			if err != nil {
@@ -144,7 +157,10 @@ func (p provenanceServer) GetCountryContributorsByComponent(ctx context.Context,
 }
 
 func (p provenanceServer) GetComponentOrigin(ctx context.Context, request *common.PurlRequest) (*pb.OriginResponse, error) { //nolint:staticcheck
-	return runPipeline(ctx, request, convertProvenanceInput,
+	return runPipeline(
+		ctx,
+		request,
+		convertProvenanceInput,
 		func(ctx context.Context, s *zap.SugaredLogger, dto []componenthelper.ComponentDTO) (*pb.OriginResponse, error) { //nolint:staticcheck
 			data, err := p.originUseCase.GetOrigin(ctx, s, dto)
 			if err != nil {

@@ -33,7 +33,6 @@ import (
 )
 
 func TestOriginUseCase(t *testing.T) {
-
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)

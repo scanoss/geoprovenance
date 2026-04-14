@@ -31,13 +31,15 @@ import (
 )
 
 // convertPurlRequestInput converts a Purl Request structure into an internal Provenance Input struct
-func convertProvenanceInput(request *common.PurlRequest) []componenthelper.ComponentDTO { //nolint:staticcheck
-	if len(request.Purls) == 0 {
-		return []componenthelper.ComponentDTO{}
+func convertProvenanceInput(request *common.PurlRequest) ([]componenthelper.ComponentDTO, error) { //nolint:staticcheck
+	if request == nil || len(request.Purls) == 0 {
+		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty purls provided", nil)
 	}
 	var componentDTOS []componenthelper.ComponentDTO
+	emptyPurlsCount := 0
 	for _, c := range request.Purls {
 		if c.Purl == "" {
+			emptyPurlsCount++
 			continue
 		}
 		componentDTOS = append(componentDTOS, componenthelper.ComponentDTO{
@@ -45,7 +47,10 @@ func convertProvenanceInput(request *common.PurlRequest) []componenthelper.Compo
 			Requirement: c.Requirement,
 		})
 	}
-	return componentDTOS
+	if emptyPurlsCount > 0 && emptyPurlsCount == len(request.Purls) {
+		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty purls provided", nil)
+	}
+	return componentDTOS, nil
 }
 
 // convertProvenanceOutput converts an internal Provenance Output structure into a Provenance Response struct
@@ -118,13 +123,15 @@ func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.Or
 }
 
 // componentsRequestToDTO converts a components request into an internal ComponentDTO
-func componentsRequestToDTO(request *common.ComponentsRequest) []componenthelper.ComponentDTO {
+func componentsRequestToDTO(request *common.ComponentsRequest) ([]componenthelper.ComponentDTO, error) {
 	if len(request.Components) == 0 {
-		return []componenthelper.ComponentDTO{}
+		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty components provided", nil)
 	}
 	var componentDTOS []componenthelper.ComponentDTO
+	emptyPurlsCount := 0
 	for _, c := range request.Components {
 		if c.Purl == "" {
+			emptyPurlsCount++
 			continue
 		}
 		componentDTOS = append(componentDTOS, componenthelper.ComponentDTO{
@@ -132,20 +139,23 @@ func componentsRequestToDTO(request *common.ComponentsRequest) []componenthelper
 			Requirement: c.Requirement,
 		})
 	}
-	return componentDTOS
+	if emptyPurlsCount > 0 && emptyPurlsCount == len(request.Components) {
+		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty purls provided", nil)
+	}
+	return componentDTOS, nil
 }
 
 // componentRequestToDTO converts a component request into an internal ComponentDTO
-func componentRequestToDTO(request *common.ComponentRequest) []componenthelper.ComponentDTO {
+func componentRequestToDTO(request *common.ComponentRequest) ([]componenthelper.ComponentDTO, error) {
 	if request == nil || request.Purl == "" {
-		return []componenthelper.ComponentDTO{}
+		return []componenthelper.ComponentDTO{}, se.NewBadRequestError("Empty component provided", nil)
 	}
 	return []componenthelper.ComponentDTO{
 		{
 			Purl:        request.Purl,
 			Requirement: request.Requirement,
 		},
-	}
+	}, nil
 }
 
 // toComponentsContributorResponse converts an internal Provenance Output structure into a Provenance Response struct
