@@ -9,10 +9,10 @@ require (
 	github.com/package-url/packageurl-go v0.1.5
 	github.com/scanoss/go-component-helper v0.6.0
 	github.com/scanoss/go-grpc-helper v0.15.1
-	github.com/scanoss/papi v0.35.0
+	github.com/scanoss/papi v0.38.0
 	github.com/scanoss/zap-logging-helper v0.4.0
 	go.uber.org/zap v1.27.1
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.80.0
 	modernc.org/sqlite v1.48.2
 )
 
