@@ -8,7 +8,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/package-url/packageurl-go v0.1.5
 	github.com/scanoss/go-component-helper v0.6.0
-	github.com/scanoss/go-grpc-helper v0.14.0
+	github.com/scanoss/go-grpc-helper v0.15.1
 	github.com/scanoss/papi v0.35.0
 	github.com/scanoss/zap-logging-helper v0.4.0
 	go.uber.org/zap v1.27.1
@@ -44,7 +44,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
-	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	modernc.org/libc v1.70.0 // indirect
