@@ -85,8 +85,9 @@ func convertProvenanceOutput(s *zap.SugaredLogger, output dtos.ProvenanceOutput)
 			CuratedLocations:  curatedLocations,
 		}
 		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
-			contributorsResponse.ErrorMessage = &p.Status.Message
-			contributorsResponse.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+			code := p.Status.StatusCode.String()
+			contributorsResponse.InfoMessage = &p.Status.Message
+			contributorsResponse.InfoCode = &code
 		}
 		response.Purls = append(response.Purls, contributorsResponse)
 	}
@@ -113,8 +114,9 @@ func convertOriginOutput(s *zap.SugaredLogger, output dtos.OriginOutput) (*pb.Or
 			Locations: locations,
 		}
 		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
-			originResponse.ErrorMessage = &p.Status.Message
-			originResponse.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+			code := p.Status.StatusCode.String()
+			originResponse.InfoMessage = &p.Status.Message
+			originResponse.InfoCode = &code
 		}
 		response.Purls = append(response.Purls, originResponse)
 	}
@@ -189,8 +191,9 @@ func toComponentsContributorResponse(output dtos.ProvenanceOutput) (*pb.Componen
 			DeclaredLocations: declaredLocations,
 		}
 		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
-			componentLocation.ErrorMessage = &p.Status.Message
-			componentLocation.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+			code := p.Status.StatusCode.String()
+			componentLocation.InfoMessage = &p.Status.Message
+			componentLocation.InfoCode = &code
 		}
 
 		response.ComponentsLocations[i] = componentLocation
@@ -233,8 +236,9 @@ func toComponentsOriginResponse(output dtos.OriginOutput) (*pb.ComponentsOriginR
 			Locations: locations,
 		}
 		if p.Status.StatusCode != domain.Success && p.Status.StatusCode != "" {
-			componentLocation.ErrorMessage = &p.Status.Message
-			componentLocation.ErrorCode = domain.StatusCodeToErrorCode(p.Status.StatusCode)
+			code := p.Status.StatusCode.String()
+			componentLocation.InfoMessage = &p.Status.Message
+			componentLocation.InfoCode = &code
 		}
 		response.ComponentsLocations[i] = componentLocation
 	}

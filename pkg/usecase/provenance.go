@@ -24,6 +24,7 @@ import (
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	"go.uber.org/zap"
+	provDomain "scanoss.com/provenance/pkg/domain"
 	"scanoss.com/provenance/pkg/dtos"
 	"scanoss.com/provenance/pkg/errors"
 	"scanoss.com/provenance/pkg/models"
@@ -141,7 +142,7 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		if existPurl(tooMany, c.Name) {
 			msg := "Too many contributors for " + c.OriginalPurl
 			provOutItem.Status.Message = msg
-			provOutItem.Status.StatusCode = domain.TooManyContributors
+			provOutItem.Status.StatusCode = provDomain.TooManyContributors
 		}
 
 		retV.Provenance = append(retV.Provenance, provOutItem)
