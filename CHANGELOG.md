@@ -7,6 +7,12 @@ Two endpoints are available for this.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-22
+### Added
+- `/health` liveness endpoint (GET) on the REST gateway
+### Changed
+- Upgraded `scanoss/go-grpc-helper` to `v0.16.0`
+
 ## [0.4.0] - 2026-04-16
 ### Changed
 - Replaced `error_message`/`error_code` with `info_message`/`info_code` on per-component info
