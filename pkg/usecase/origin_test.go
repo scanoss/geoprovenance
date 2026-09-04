@@ -19,7 +19,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -48,29 +47,10 @@ func TestOriginUseCase(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 
-	conn, err := db.Connx(ctx) // Get a connection from the pool
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-
-	sqliteConn := conn.Raw(func(driverConn interface{}) error {
-		if sqliteConn, ok := driverConn.(interface {
-			CreateFunction(name string, nArg int, deterministic bool, f interface{}) error
-		}); ok {
-			// Register CONCAT function
-			err := sqliteConn.CreateFunction("CONCAT", -1, true, func(args ...string) string {
-				return strings.Join(args, "")
-			})
-			if err != nil {
-				return fmt.Errorf("error registering CONCAT: %w", err)
-			}
-		} else {
-			return fmt.Errorf("could not load SQLite connection with CreateFunction capability")
-		}
-		return nil
-	})
-	_ = sqliteConn
-	defer models.CloseConn(conn)
+	// No connection is checked out here, and no CONCAT function is registered: the
+	// mining origin query used concat() over an array column, and the serving one
+	// does not. Holding the pool's only connection - an in-memory SQLite database
+	// is per-connection - would leave the queries under test waiting for it.
 	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)

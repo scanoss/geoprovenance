@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2018-2022 SCANOSS.COM
+ * Copyright (C) 2018-2025 SCANOSS.COM
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,23 +14,40 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Handle all interaction with the many tables to get provenance
+// Handle all interaction with the serving tables that carry geoprovenance.
 
 package models
 
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
+// ProvenanceModel reads where a component's contributors are from.
+//
+// Mining spread this across four tables: `github_contributors` linked a purl name
+// to a contributor login, `vendors` turned that login into a vendor id and a type
+// (author or contributor), and `vendor_locations` held the vendor's declared
+// location, a timezone-inferred country and a curated country id. Serving reduces
+// it to `contribution(purl_id → contributor_id)` → `vendor_location(vendor_id →
+// country_id)` → `country`, so:
+//
+//   - lookups key on the component's purl_id rather than its purl name;
+//   - the curated country is the only geographic signal, and both the curated
+//     locations and the origin distribution derive from it;
+//   - there is no declared location, no vendor name and no vendor type, so the
+//     declared-locations part of the response has no source;
+//   - there is no too_many_contributors table.
 type ProvenanceModel struct {
 	db *sqlx.DB
 }
 
+// Provenance is one contributor's declared location. Serving records none, so
+// nothing populates this any more; it is kept because the response DTO is built
+// from it.
 type Provenance struct {
 	Type             string `db:"type"`
 	PurlName         string `db:"purl_name"`
@@ -39,6 +56,8 @@ type Provenance struct {
 	CountriesID      string `db:"countries_id"`
 }
 
+// Origin is one country and how many of the component's contributors it accounts
+// for. It backs both the curated locations and the origin distribution.
 type Origin struct {
 	CountryName      string `db:"country"`
 	ContributorCount int16  `db:"vendor_count"`
@@ -54,112 +73,31 @@ func NewProvenanceModel(db *sqlx.DB) *ProvenanceModel {
 	return &ProvenanceModel{db: db}
 }
 
-// ProcessCuratedVendors assigns a list of country name to given set of id's of a set of provenance records.
-func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string]map[string]int {
-	curatedCountries := make(map[string]map[string]int)
-	for _, v := range vendors {
-		if v.CountriesID != "" {
-			listStr := strings.ReplaceAll(v.CountriesID, "{", "")
-			listStr = strings.ReplaceAll(listStr, "}", "")
-			list := strings.Split(listStr, ",")
-			if len(list) == 0 {
-				list = append(list, listStr)
-			}
-			_, exist := curatedCountries[v.PurlName]
-			if !exist {
-				curatedCountries[v.PurlName] = make(map[string]int)
-			}
-			curatedCountries[v.PurlName][list[0]]++
-		}
+// countryCountsQuery counts a component's contributors per country.
+//
+// The mining origin query read `vendor_locations.timezone_based_country`, a
+// country inferred from the contributor's commit timezone. Serving has no such
+// column, so this counts the curated country instead. Where mining recorded both,
+// the two agree on 119,906 of 120,988 vendors; the curated set is the smaller one,
+// so fewer components resolve to an origin at all.
+const countryCountsQuery = `SELECT c.name AS country, COUNT(DISTINCT vl.vendor_id) AS vendor_count
+FROM contribution ct
+INNER JOIN vendor_location vl ON vl.vendor_id = ct.contributor_id
+INNER JOIN country c ON c.id = vl.country_id
+WHERE ct.purl_id = ? AND c.name IS NOT NULL AND c.name <> ''
+GROUP BY c.name
+ORDER BY vendor_count DESC, country ASC`
+
+// GetCountryCountsByPurlID returns the component's contributor distribution by
+// country, highest first.
+func (m *ProvenanceModel) GetCountryCountsByPurlID(ctx context.Context, s *zap.SugaredLogger, purlID string) ([]Origin, error) {
+	if len(purlID) == 0 {
+		return []Origin{}, nil
 	}
-	return curatedCountries
-}
-
-// GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames.
-func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]Provenance, error) {
-	list := ""
-	list = strings.Join(purlNames, "','")
-	list = "('" + list + "')"
-	var allSources []Provenance
-	query := `
-		    SELECT DISTINCT
-		        gc.purl_name AS purl_name,
-		        vd.type AS type,
-		        vd.username AS vendor_name,
-		        CASE
-					WHEN vl.declared_location IS NULL THEN ''
-					ELSE
-						vl.declared_location
-				END AS declared_location,
-		        CASE
-		            WHEN vl.curated_countries_ids IS NULL THEN ''
-		            ELSE
-		                CASE
-		                    WHEN vl.curated_countries_ids = '{}' THEN ''
-		                    ELSE concat(vl.curated_countries_ids)
-		                END
-		        END AS countries_id
-		    FROM vendors vd
-		    left JOIN github_contributors gc ON gc.contributor = vd.username
-		    left JOIN vendor_locations vl ON vl.vendor_id = vd.id
-		    WHERE gc.purl_name IN ` + list + `
-		      AND vd.type IS NOT NULL
-		      AND vd.mine_id = 5
-		      AND vl.declared_location IS NOT NULL;`
-
-	err := m.db.SelectContext(ctx, &allSources, query)
-	if err != nil {
-		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
-		return nil, fmt.Errorf("failed to query : %v", err)
+	var counts []Origin
+	if err := m.db.SelectContext(ctx, &counts, m.db.Rebind(countryCountsQuery), purlID); err != nil {
+		s.Errorf("Error: Failed to query the contributor countries for %v: %v", purlID, err)
+		return nil, fmt.Errorf("failed to query the contributor countries: %w", err)
 	}
-	return allSources, nil
-}
-
-// GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames.
-func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]string, error) {
-	list := ""
-	list = strings.Join(purlNames, "','")
-	list = "('" + list + "')"
-	var purls []string
-	query := ` 
-			select tmc.purl_name 
-			from too_many_contributors tmc 
-			where tmc.purl_name in ` + list + `
-		      AND tmc.mine_id = 5;`
-	err := m.db.SelectContext(ctx, &purls, query)
-	if err != nil {
-		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
-		return nil, fmt.Errorf("failed to query : %v", err)
-	}
-
-	return purls, nil
-}
-
-func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(ctx context.Context, s *zap.SugaredLogger, purlName string) ([]Origin, error) {
-	var allSources []Origin
-	query := `
-		SELECT
-  vl.timezone_based_country AS country,
-  COUNT(DISTINCT v.id) AS vendor_count
-FROM
-  github_contributors gc
-JOIN
-  vendors v ON gc.contributor = v.username
-JOIN
-  vendor_locations vl ON v.id = vl.vendor_id
-WHERE
-  gc.purl_name = $1
-  AND vl.timezone_based_country IS NOT NULL 
-GROUP BY
- country
-ORDER BY
-  vendor_count DESC;
-
-`
-	err := m.db.SelectContext(ctx, &allSources, query, purlName)
-	if err != nil {
-		s.Errorf("Error: Failed to query %v: %+v", purlName, err)
-		return nil, fmt.Errorf("failed to query : %v", err)
-	}
-	return allSources, nil
+	return counts, nil
 }

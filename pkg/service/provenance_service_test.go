@@ -139,21 +139,18 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 			expectedResponse: dtos.ProvenanceOutput{
 				Provenance: []dtos.ProvenanceOutputItem{
 					{
-						Purl: "pkg:github/scanoss/engine",
-						DeclaredLocations: []dtos.DeclaredProvenanceItem{
-							{
-								Type:     "User",
-								Location: "Tandil",
-							},
-							{
-								Type:     "User",
-								Location: "Argentina",
-							},
-						},
+						// Serving records no declared location and no vendor type, so this
+						// part of the response has no source and comes back empty. The
+						// curated count is the distinct contributors located in the
+						// country; mining reported 2 because its query also required a
+						// declared location and a vendor type, filters serving has no
+						// columns for.
+						Purl:              "pkg:github/scanoss/engine",
+						DeclaredLocations: []dtos.DeclaredProvenanceItem{},
 						CuratedLocations: []dtos.CuratedProvenanceItem{
 							{
 								Country: "Argentina",
-								Count:   2,
+								Count:   4,
 							},
 						},
 					},
@@ -282,8 +279,9 @@ func TestCProvenanceServer_GetComponentContributors(t *testing.T) {
 		}
 		if enginePurl == nil {
 			t.Error("expected to find pkg:github/scanoss/engine in response")
-		} else if len(enginePurl.DeclaredLocations) == 0 {
-			t.Error("expected to get at least 1 declared location")
+		} else if len(enginePurl.DeclaredLocations) != 0 {
+			t.Errorf("declared locations = %+v, want none: the serving schema records no declared location",
+				enginePurl.DeclaredLocations)
 		} else if len(enginePurl.CuratedLocations) == 0 {
 			t.Error("expected to get at least 1 curated location")
 		} else {

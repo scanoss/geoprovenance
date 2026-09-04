@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2018-2022 SCANOSS.COM
+ * Copyright (C) 2018-2025 SCANOSS.COM
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,54 +14,72 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Handle all interaction with the mines table
-
 package models
 
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
+// CountriesModel resolves a country id to its name. Serving names the table
+// `country` and the column `name`, where mining had `countries.country_name`.
 type CountriesModel struct {
 	db *sqlx.DB
 }
+
 type countryRow struct {
 	ID      int    `db:"id"`
-	Country string `db:"country_name"`
+	Country string `db:"name"`
 }
 
-// NewCountryMapModel creates a new instance of the Mine Model.
+// NewCountryMapModel creates a new instance of the Countries Model.
 func NewCountryMapModel(db *sqlx.DB) *CountriesModel {
 	return &CountriesModel{db: db}
 }
 
-var countryMap map[int]string
+// The country table is small (284 rows) and immutable, so it is read once and
+// cached. The mutex replaces a bare package-level map that several request
+// goroutines populated concurrently.
+var (
+	countryMapMu sync.RWMutex
+	countryMap   map[int]string
+)
 
-// GetCountryByID Gets a list of the Purl Type IDs associated with the given Purl Type (string).
+// GetCountryByID returns the country name for an id, loading the table on first use.
 func (m *CountriesModel) GetCountryByID(ctx context.Context, s *zap.SugaredLogger, id int) (string, error) {
-	if countryMap == nil {
-		countryMap = make(map[int]string)
-
-		var countries []countryRow
-		err := m.db.SelectContext(ctx, &countries, "SELECT id,country_name FROM countries")
-		if err != nil {
-			// zlog.S.Errorf("Error: Failed to query country table for %v: %v", purlType, err)
-			return "", fmt.Errorf("failed to query the mines table: %v", err)
-		}
-
-		for _, country := range countries {
-			countryMap[country.ID] = country.Country
+	countryMapMu.RLock()
+	loaded := countryMap != nil
+	countryMapMu.RUnlock()
+	if !loaded {
+		if err := m.loadCountries(ctx); err != nil {
+			return "", err
 		}
 	}
-	c, exist := countryMap[id]
-	if !exist {
-		s.Error("coutry not found")
-		return "N/A", fmt.Errorf("coutry not found")
-	} else {
-		return c, nil
+	countryMapMu.RLock()
+	name, exists := countryMap[id]
+	countryMapMu.RUnlock()
+	if !exists {
+		s.Errorf("country %d not found", id)
+		return "N/A", fmt.Errorf("country %d not found", id)
 	}
+	return name, nil
+}
+
+func (m *CountriesModel) loadCountries(ctx context.Context) error {
+	var countries []countryRow
+	if err := m.db.SelectContext(ctx, &countries, "SELECT id, name FROM country"); err != nil {
+		return fmt.Errorf("failed to query the country table: %w", err)
+	}
+	loaded := make(map[int]string, len(countries))
+	for _, c := range countries {
+		loaded[c.ID] = c.Country
+	}
+	countryMapMu.Lock()
+	countryMap = loaded
+	countryMapMu.Unlock()
+	return nil
 }

@@ -48,11 +48,9 @@ func TestProvenanceUseCase(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 
-	conn, err := db.Connx(ctx) // Get a connection from the pool
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer models.CloseConn(conn)
+	// No connection is checked out here. An in-memory SQLite database is
+	// per-connection so the pool is pinned to one, and holding it would leave the
+	// queries under test waiting for it forever.
 	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
@@ -74,9 +72,14 @@ func TestProvenanceUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
-	if len(countries.Provenance[0].DeclaredLocations) == 0 {
-		t.Fatalf("Expected to get at least 1 declared location")
-
+	// Serving records only the curated country per contributor, so the curated
+	// locations carry the answer and the declared ones have no source.
+	if len(countries.Provenance[0].CuratedLocations) == 0 {
+		t.Fatalf("Expected to get at least 1 curated location")
+	}
+	if len(countries.Provenance[0].DeclaredLocations) != 0 {
+		t.Errorf("declared locations = %+v, want none: the serving schema records no declared location",
+			countries.Provenance[0].DeclaredLocations)
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v\n", countries)

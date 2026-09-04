@@ -2,12 +2,13 @@
   "App": {
     "Name": "GEO Provenance Service",
     "Debug": false,
-    "Mode":  "prod",
+    "Mode": "prod",
     "GRPCPort": "50056",
     "RESTPort": "40056"
   },
   "Database": {
-    "Driver": "sqlite",
+    "Driver": "duckdb",
+    "Path": "/var/lib/scanoss/serving.duckdb",
     "Dsn": "/var/lib/scanoss/db/sqlite/geoprovenance/geoprovenance.sqlite?cache=shared&mode=memory"
   },
   "TLS": {
