@@ -34,6 +34,7 @@ type ProvenanceUseCase struct {
 	db              *sqlx.DB
 	provenanceModel *models.ProvenanceModel
 	countryMapModel *models.CountriesModel
+	servingModel    *models.ServingModel // non-nil when reading the serving schema
 }
 type ProvenanceWorkerStruct struct {
 	URLMd5  string
@@ -45,6 +46,15 @@ type InternalQuery struct {
 	PurlName        string
 	Requirement     string
 	SelectedVersion string
+}
+
+// purlsOf returns the purl strings of the given component DTOs, in order.
+func purlsOf(components []componenthelper.ComponentDTO) []string {
+	purls := make([]string, 0, len(components))
+	for _, c := range components {
+		purls = append(purls, c.Purl)
+	}
+	return purls
 }
 
 func existPurl(purls []string, purl string) bool {
@@ -64,8 +74,24 @@ func NewProvenance(db *sqlx.DB) *ProvenanceUseCase {
 	}
 }
 
+// NewProvenanceServing creates a provenance use case that reads the serving
+// schema (component / contribution / vendor_location / country) instead of the
+// legacy mining tables.
+func NewProvenanceServing(db *sqlx.DB) *ProvenanceUseCase {
+	return &ProvenanceUseCase{
+		db:           db,
+		servingModel: models.NewServingModel(db),
+	}
+}
+
 // GetProvenance takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct.
 func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogger, components []componenthelper.ComponentDTO) (dtos.ProvenanceOutput, error) {
+	if p.servingModel != nil {
+		if len(components) == 0 {
+			return dtos.ProvenanceOutput{}, errors.NewNotFoundError("No Provenance data found for the given Purl(s)")
+		}
+		return getProvenanceServing(ctx, s, p.servingModel, purlsOf(components))
+	}
 	validComponents := make([]componenthelper.Component, 0)
 	purlNames := make([]string, 0)
 	retV := dtos.ProvenanceOutput{}

@@ -27,6 +27,7 @@ import (
 
 	"github.com/golobby/config/v3"
 	"github.com/golobby/config/v3/pkg/feeder"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/scanoss/go-grpc-helper/pkg/files"
 	gd "github.com/scanoss/go-grpc-helper/pkg/grpc/database"
@@ -34,6 +35,7 @@ import (
 	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
 	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
+	"scanoss.com/provenance/pkg/models"
 	"scanoss.com/provenance/pkg/protocol/grpc"
 	"scanoss.com/provenance/pkg/protocol/rest"
 	"scanoss.com/provenance/pkg/service"
@@ -99,6 +101,9 @@ func RunServer() error {
 	}
 
 	zlog.S.Infof("Starting SCANOSS Provenance Service: %v", strings.TrimSpace(version))
+	if cfg.Database.Driver == models.DriverDuckDB && !models.DuckDBSupported {
+		return fmt.Errorf("DB_DRIVER=%s requires a binary built with the `duckdb` tag (make build_amd_duckdb)", models.DriverDuckDB)
+	}
 	// Set up the database connection pool
 	db, err := gd.OpenDBConnection(cfg.Database.Dsn, cfg.Database.Driver, cfg.Database.User, cfg.Database.Passwd,
 		cfg.Database.Host, cfg.Database.Schema, cfg.Database.SslMode)
@@ -109,6 +114,12 @@ func RunServer() error {
 		return err
 	}
 	defer gd.CloseDBConnection(db)
+	logSchemaInfo(db)
+	if models.ServingModeEnabled(context.Background(), db, cfg.Database.Serving) {
+		zlog.S.Infof("Reading the serving schema (DB_SERVING=%s)", cfg.Database.Serving)
+	} else {
+		zlog.S.Infof("Reading the legacy mining tables (DB_SERVING=%s)", cfg.Database.Serving)
+	}
 	// Setup dynamic logging (if necessary)
 	zlog.SetupAppDynamicLogging(cfg.Logging.DynamicPort, cfg.Logging.DynamicLogging)
 
@@ -130,4 +141,16 @@ func RunServer() error {
 	}
 
 	return gs.WaitServerComplete(srv, server)
+}
+
+// logSchemaInfo logs the serving database's db_version contract when present
+// (package, schema version, extract release); silent for legacy stores.
+func logSchemaInfo(db *sqlx.DB) {
+	info, err := models.ReadSchemaInfo(context.Background(), db)
+	switch {
+	case err != nil:
+		zlog.S.Warnf("Failed to read db_version: %v", err)
+	case info.Present:
+		zlog.S.Infof("Serving schema: package=%s schema_version=%s db_release=%s", info.PackageName, info.SchemaVersion, info.DBRelease)
+	}
 }

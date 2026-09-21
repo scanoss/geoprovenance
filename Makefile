@@ -68,6 +68,15 @@ build_amd: version  ## Build an AMD 64 binary
 	go generate ./pkg/cmd/server.go
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-w -s" -o ./target/scanoss-geoprovenance-api-linux-amd64 ./cmd/server
 
+build_amd_duckdb: version  ## Build an AMD 64 binary with the DuckDB driver (cgo, -tags duckdb)
+	@echo "Building AMD binary with DuckDB support $(VERSION)..."
+	go generate ./pkg/cmd/server.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -tags duckdb -ldflags="-w -s" -o ./target/scanoss-geoprovenance-api-linux-amd64-duckdb ./cmd/server
+
+unit_test_duckdb: version ## Run the unit tests with the DuckDB driver compiled in (cgo, -tags duckdb)
+	@echo "Running unit test framework with the duckdb tag..."
+	CGO_ENABLED=1 go test -tags duckdb -v ./pkg/...
+
 build_arm: version  ## Build an ARM 64 binary
 	@echo "Building ARM binary $(VERSION)..."
 	go generate ./pkg/cmd/server.go

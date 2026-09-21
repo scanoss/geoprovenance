@@ -6,6 +6,18 @@ Two endpoints are available for this.
 - Based on calculations of the user data (commits, history, timezone,name)
 
 ## [Unreleased]
+### Added
+- Serving-schema data path: when the database carries the normalized serving tables
+  (`component`, `contribution`, `vendor_location`, `country`) the service reads them by
+  `purl_id` instead of the legacy mining tables. Selected automatically (`DB_SERVING=auto`,
+  default) or forced with `DB_SERVING=true|false`
+- `DB_DRIVER=duckdb` support behind the `duckdb` build tag (`make build_amd_duckdb`,
+  `make unit_test_duckdb`); the default pure-Go build rejects the driver at startup
+- Startup log of the serving database's `db_version` contract (package, schema version, release)
+### Changed
+- In serving mode `declared_locations` is empty and the `TOO_MANY_CONTRIBUTORS` flag is not
+  emitted: the serving export carries neither. `/origin` derives from the curated country per
+  contributor (the export has no timezone-based country)
 
 ## [0.5.0] - 2026-06-22
 ### Added

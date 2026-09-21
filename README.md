@@ -66,3 +66,35 @@ After changing a Provenance version, please run the following command:
 go mod tidy -compat=1.19
 ```
 https://mholt.github.io/json-to-go/
+
+## Serving schema and DuckDB
+
+Besides the legacy mining tables (`github_contributors`, `vendors`, `vendor_locations`,
+`countries`, `too_many_contributors`) the service can read the normalized **serving schema**
+produced by the SCANOSS ETL (`component`, `component_version`, `contribution`,
+`vendor_location`, `country`, plus the `db_version` stamp), keyed by `purl_id`. The
+`geoprovenance` package cut by `split_duckdb.sh` is exactly that set of tables.
+
+Which path runs is decided once at startup:
+
+```bash
+DB_SERVING=auto   # default: serving when `component` and `contribution` exist, legacy otherwise
+DB_SERVING=true   # force the serving schema
+DB_SERVING=false  # force the legacy mining tables
+```
+
+The serving schema can be served from SQLite, Postgres or DuckDB. DuckDB needs a binary built
+with the `duckdb` tag (the driver is cgo), and the file should be opened read-only:
+
+```bash
+make build_amd_duckdb
+DB_DRIVER=duckdb DB_DSN="/var/lib/scanoss/db/geoprovenance.duckdb?access_mode=read_only" \
+  ./target/scanoss-geoprovenance-api-linux-amd64-duckdb
+```
+
+A binary built without the tag refuses `DB_DRIVER=duckdb` at startup with a clear message.
+
+Known differences in serving mode, inherited from the export: `declared_locations` is always
+empty, the `TOO_MANY_CONTRIBUTORS` flag is not emitted, and `/origin` is derived from the
+curated country of each contributor rather than the timezone-based estimate.
+

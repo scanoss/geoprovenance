@@ -34,6 +34,7 @@ import (
 
 type OriginUseCase struct {
 	provenanceModel *models.ProvenanceModel
+	servingModel    *models.ServingModel // non-nil when reading the serving schema
 	db              *sqlx.DB
 }
 
@@ -43,10 +44,22 @@ func NewOrigin(db *sqlx.DB) *OriginUseCase {
 		provenanceModel: models.NewProvenanceModel(db)}
 }
 
+// NewOriginServing creates an origin use case that reads the serving schema
+// instead of the legacy mining tables.
+func NewOriginServing(db *sqlx.DB) *OriginUseCase {
+	return &OriginUseCase{
+		db:           db,
+		servingModel: models.NewServingModel(db),
+	}
+}
+
 // GetOrigin takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
 //
 //goland:noinspection ALL
 func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, components []componenthelper.ComponentDTO) (dtos.OriginOutput, error) {
+	if p.servingModel != nil {
+		return getOriginServing(ctx, s, p.servingModel, purlsOf(components))
+	}
 	sanitizedComponents := componenthelper.GetComponentsVersion(componenthelper.ComponentVersionCfg{
 		MaxWorkers: 5,
 		DB:         p.db,

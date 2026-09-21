@@ -28,6 +28,7 @@ import (
 	"go.uber.org/zap"
 	myconfig "scanoss.com/provenance/pkg/config"
 	se "scanoss.com/provenance/pkg/errors"
+	"scanoss.com/provenance/pkg/models"
 	"scanoss.com/provenance/pkg/usecase"
 )
 
@@ -38,7 +39,17 @@ type provenanceServer struct {
 	originUseCase     *usecase.OriginUseCase
 }
 
+// NewProvenanceServer wires the gRPC server. The data path is chosen once here:
+// the serving schema (component / contribution / ...) when DB_SERVING is true or,
+// in auto mode, when those tables are present; otherwise the legacy mining tables.
 func NewProvenanceServer(db *sqlx.DB, config *myconfig.ServerConfig) pb.GeoProvenanceServer {
+	if models.ServingModeEnabled(context.Background(), db, config.Database.Serving) {
+		return &provenanceServer{
+			config:            config,
+			provenanceUseCase: usecase.NewProvenanceServing(db),
+			originUseCase:     usecase.NewOriginServing(db),
+		}
+	}
 	return &provenanceServer{
 		config:            config,
 		provenanceUseCase: usecase.NewProvenance(db),

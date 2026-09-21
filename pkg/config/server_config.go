@@ -54,7 +54,8 @@ type ServerConfig struct {
 		Schema  string `env:"DB_SCHEMA"`
 		SslMode string `env:"DB_SSL_MODE"` // enable/disable
 		Dsn     string `env:"DB_DSN"`
-		Trace   bool   `env:"DB_TRACE"` // true/false
+		Trace   bool   `env:"DB_TRACE"`   // true/false
+		Serving string `env:"DB_SERVING"` // auto/true/false - read the serving schema (component/contribution) instead of the mining tables
 	}
 	TLS struct {
 		CertFile string `env:"PROVENANCE_TLS_CERT"` // TLS Certificate
@@ -101,6 +102,7 @@ func setServerConfigDefaults(cfg *ServerConfig) {
 	cfg.Database.Schema = "scanoss"
 	cfg.Database.SslMode = "disable"
 	cfg.Database.Trace = false
+	cfg.Database.Serving = "auto"
 	cfg.Logging.DynamicLogging = true
 	cfg.Logging.DynamicPort = "localhost:60056"
 	cfg.Telemetry.Enabled = false

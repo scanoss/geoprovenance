@@ -61,6 +61,12 @@ func LoadTestSQLData(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error {
 	return loadTestSQLDataFiles(db, ctx, conn, files)
 }
 
+// LoadServingTestSQLData loads the serving-schema fixture (component,
+// component_version, contribution, vendor_location, country, db_version).
+func LoadServingTestSQLData(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error {
+	return loadTestSQLDataFiles(db, ctx, conn, []string{"../models/tests/serving.sql"})
+}
+
 // loadTestSQLDataFiles loads a list of test SQL files.
 func loadTestSQLDataFiles(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn, files []string) error {
 	for _, file := range files {
