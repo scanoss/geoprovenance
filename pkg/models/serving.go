@@ -70,6 +70,14 @@ type SchemaInfo struct {
 	Present       bool   `db:"-"`
 }
 
+// CountryCount is one (country, distinct vendors) row of the serving distribution.
+// Count is a plain int: the serving path has no too_many_contributors cap, so a
+// popular repository can exceed what the legacy int16 Origin.ContributorCount holds.
+type CountryCount struct {
+	Country string `db:"country"`
+	Count   int    `db:"vendor_count"`
+}
+
 // NewServingModel creates a new instance of the serving model.
 func NewServingModel(db *sqlx.DB) *ServingModel {
 	return &ServingModel{db: db}
@@ -139,17 +147,22 @@ func (m *ServingModel) ResolveComponent(ctx context.Context, s *zap.SugaredLogge
 
 // GetCountryCountsByPurlID returns the component's contributors' distribution
 // by country: distinct vendors per country, highest first, skipping empty names.
-func (m *ServingModel) GetCountryCountsByPurlID(ctx context.Context, s *zap.SugaredLogger, purlID string) ([]Origin, error) {
+//
+// purlID always comes from ResolveComponent (never from user input), so it is
+// compared uncast: DuckDB coerces the parameter to UUID and keeps the filter
+// pushed into the scan, whereas CAST(ct.purl_id AS VARCHAR) = ? would force a
+// full scan of `contribution` per request.
+func (m *ServingModel) GetCountryCountsByPurlID(ctx context.Context, s *zap.SugaredLogger, purlID string) ([]CountryCount, error) {
 	if purlID == "" {
 		return nil, nil
 	}
-	var rows []Origin
+	var rows []CountryCount
 	q := m.db.Rebind(`
 		SELECT c.name AS country, COUNT(DISTINCT vl.vendor_id) AS vendor_count
 		FROM contribution ct
 		JOIN vendor_location vl ON vl.vendor_id = ct.contributor_id
 		JOIN country c ON c.id = vl.country_id
-		WHERE CAST(ct.purl_id AS VARCHAR) = ? AND c.name IS NOT NULL AND c.name <> ''
+		WHERE ct.purl_id = ? AND c.name IS NOT NULL AND c.name <> ''
 		GROUP BY c.name
 		ORDER BY vendor_count DESC, country ASC`)
 	if err := m.db.SelectContext(ctx, &rows, q, purlID); err != nil {

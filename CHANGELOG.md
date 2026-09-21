@@ -8,8 +8,8 @@ Two endpoints are available for this.
 ## [Unreleased]
 ### Added
 - Serving-schema data path: when the database carries the normalized serving tables
-  (`component`, `contribution`, `vendor_location`, `country`) the service reads them by
-  `purl_id` instead of the legacy mining tables. Selected automatically (`DB_SERVING=auto`,
+  (`component` and `contribution` are probed) the service reads `component`, `contribution`,
+  `vendor_location` and `country` by `purl_id` instead of the legacy mining tables. Selected automatically (`DB_SERVING=auto`,
   default) or forced with `DB_SERVING=true|false`
 - `DB_DRIVER=duckdb` support behind the `duckdb` build tag (`make build_amd_duckdb`,
   `make unit_test_duckdb`); the default pure-Go build rejects the driver at startup
@@ -17,7 +17,8 @@ Two endpoints are available for this.
 ### Changed
 - In serving mode `declared_locations` is empty and the `TOO_MANY_CONTRIBUTORS` flag is not
   emitted: the serving export carries neither. `/origin` derives from the curated country per
-  contributor (the export has no timezone-based country)
+  contributor (the export has no timezone-based country). Items echo the purl as requested
+  and report `SUCCESS` without a version lookup (geoprovenance is per component)
 
 ## [0.5.0] - 2026-06-22
 ### Added

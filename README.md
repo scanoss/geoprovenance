@@ -96,5 +96,8 @@ A binary built without the tag refuses `DB_DRIVER=duckdb` at startup with a clea
 
 Known differences in serving mode, inherited from the export: `declared_locations` is always
 empty, the `TOO_MANY_CONTRIBUTORS` flag is not emitted, and `/origin` is derived from the
-curated country of each contributor rather than the timezone-based estimate.
+curated country of each contributor rather than the timezone-based estimate. Items echo the
+purl exactly as requested and report `SUCCESS` without a version lookup, since geoprovenance
+is resolved per component. The component is matched on `component.purl` built as
+`pkg:<type>/<purl_name>`, i.e. the same normalisation as the legacy `purl_name` lookup.
 

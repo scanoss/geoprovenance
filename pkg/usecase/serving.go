@@ -26,8 +26,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
-	"github.com/package-url/packageurl-go"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	"go.uber.org/zap"
 	"scanoss.com/provenance/pkg/dtos"
@@ -37,29 +37,27 @@ import (
 
 // servingResult is the outcome of resolving one purl against the serving schema.
 type servingResult struct {
-	Counts []models.Origin
+	Counts []models.CountryCount
 	Status domain.ComponentStatus
 }
 
 // ServingPurlKey converts a request purl into the serving `component.purl`
-// key: "pkg:<type>/<namespace/name>", version/qualifiers/subpath stripped,
-// with the same golang-GitHub rewrite the legacy path applies.
+// key. The export builds that column as 'pkg:' || purl_type || '/' || purl_name
+// from the mining tables, so the key is derived exactly like the legacy path
+// derives purl_name (utils.PurlNameFromString): version, qualifiers and subpath
+// stripped, lower-cased except for npm/nuget, percent-encoding kept as stored
+// (e.g. pkg:npm/%40angular/core), after the golang-GitHub rewrite.
 func ServingPurlKey(purl string) (string, error) {
-	if purl == "" {
-		return "", fmt.Errorf("no purl string supplied to parse")
-	}
-	p, err := packageurl.FromString(utils.ConvertPurlString(purl))
+	purl = utils.ConvertPurlString(strings.TrimSpace(purl))
+	name, err := utils.PurlNameFromString(purl)
 	if err != nil {
 		return "", err
 	}
-	if p.Type == "" || p.Name == "" {
-		return "", fmt.Errorf("no purl type/name found in '%v'", purl)
+	purlType, _, ok := strings.Cut(strings.TrimPrefix(purl, "pkg:"), "/")
+	if !ok || purlType == "" {
+		return "", fmt.Errorf("no purl type found in '%v'", purl)
 	}
-	name := p.Name
-	if p.Namespace != "" {
-		name = p.Namespace + "/" + p.Name
-	}
-	return "pkg:" + p.Type + "/" + name, nil
+	return "pkg:" + strings.ToLower(purlType) + "/" + name, nil
 }
 
 // resolveServing resolves one purl and returns its contributors' country
@@ -112,7 +110,7 @@ func getProvenanceServing(ctx context.Context, s *zap.SugaredLogger, m *models.S
 		item := dtos.ProvenanceOutputItem{Purl: purl, Status: res.Status}
 		for _, c := range res.Counts {
 			item.CuratedLocations = append(item.CuratedLocations,
-				dtos.CuratedProvenanceItem{Country: c.CountryName, Count: int(c.ContributorCount)})
+				dtos.CuratedProvenanceItem{Country: c.Country, Count: c.Count})
 		}
 		retV.Provenance = append(retV.Provenance, item)
 	}
@@ -129,16 +127,15 @@ func getOriginServing(ctx context.Context, s *zap.SugaredLogger, m *models.Servi
 			return dtos.OriginOutput{}, err
 		}
 		item := dtos.OriginOutputItem{Purl: purl, Status: res.Status}
-		var total int16
+		total := 0
 		for _, c := range res.Counts {
-			total += c.ContributorCount
+			total += c.Count
 		}
 		for _, c := range res.Counts {
-			percentage := float32(c.ContributorCount*100) / float32(total)
+			percentage := float64(c.Count) * 100 / float64(total)
 			item.Countries = append(item.Countries, dtos.CountryInfo{
-				Name:       c.CountryName,
-				Percentage: float32(math.Round(float64(percentage*100)) / 100),
-				UserCount:  c.ContributorCount,
+				Name:       c.Country,
+				Percentage: float32(math.Round(percentage*100) / 100),
 			})
 		}
 		retV.Provenance = append(retV.Provenance, item)

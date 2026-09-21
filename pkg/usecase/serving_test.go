@@ -29,7 +29,10 @@ func TestServingPurlKey(t *testing.T) {
 		{purl: "pkg:github/scanoss/engine", want: "pkg:github/scanoss/engine"},
 		{purl: "pkg:github/scanoss/engine@v5.0.0?foo=bar#sub/path", want: "pkg:github/scanoss/engine"},
 		{purl: "pkg:golang/github.com/scanoss/engine", want: "pkg:github/scanoss/engine"},
-		{purl: "pkg:npm/%40angular/core", want: "pkg:npm/@angular/core"},
+		{purl: "pkg:npm/%40angular/core@17.0.0", want: "pkg:npm/%40angular/core"},
+		{purl: "pkg:npm/Express", want: "pkg:npm/Express"},
+		{purl: "pkg:maven/Org.Foo/Bar@1.0", want: "pkg:maven/org.foo/bar"},
+		{purl: "pkg:GitHub/SCANOSS/Engine", want: "pkg:github/scanoss/engine"},
 		{purl: "", wantErr: true},
 		{purl: "not-a-purl", wantErr: true},
 	}

@@ -88,7 +88,7 @@ func TestDuckDB_ServingQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("counts: %v", err)
 	}
-	if len(rows) != 2 || rows[0].CountryName != "USA" || rows[0].ContributorCount != 2 || rows[1].CountryName != "Spain" || rows[1].ContributorCount != 1 {
+	if len(rows) != 2 || rows[0].Country != "USA" || rows[0].Count != 2 || rows[1].Country != "Spain" || rows[1].Count != 1 {
 		t.Errorf("distribution = %+v, want USA:2 Spain:1", rows)
 	}
 }
