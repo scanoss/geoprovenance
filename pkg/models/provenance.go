@@ -41,7 +41,7 @@ type Provenance struct {
 
 type Origin struct {
 	CountryName      string `db:"country"`
-	ContributorCount int16  `db:"vendor_count"`
+	ContributorCount int    `db:"vendor_count"`
 }
 
 type LocationDistribution struct {
@@ -75,39 +75,40 @@ func (m *ProvenanceModel) ProcessCuratedVendors(vendors []Provenance) map[string
 	return curatedCountries
 }
 
+// githubMineID is the mine ID of github.com, the only mine with contributor data.
+// It is inlined in the queries (not bound) so SQLite compares it against TEXT columns correctly.
+const githubMineID = "5"
+
 // GetProvenanceByPurlNames get declared and curated locations for contributors and authors from a list of purlnames.
 func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]Provenance, error) {
-	list := ""
-	list = strings.Join(purlNames, "','")
-	list = "('" + list + "')"
+	if len(purlNames) == 0 {
+		return []Provenance{}, nil
+	}
 	var allSources []Provenance
+	// Missing values may be NULL or '' (both engines store empty declared locations as '').
+	// Curated IDs are cast to TEXT because they are an integer array in PostgreSQL.
+	// A location is kept if it has a declared location or curated countries (curated countries
+	// can exist without a declared location).
 	query := `
 		    SELECT DISTINCT
 		        gc.purl_name AS purl_name,
 		        vd.type AS type,
 		        vd.username AS vendor_name,
+		        COALESCE(vl.declared_location, '') AS declared_location,
 		        CASE
-					WHEN vl.declared_location IS NULL THEN ''
-					ELSE
-						vl.declared_location
-				END AS declared_location,
-		        CASE
-		            WHEN vl.curated_countries_ids IS NULL THEN ''
-		            ELSE
-		                CASE
-		                    WHEN vl.curated_countries_ids = '{}' THEN ''
-		                    ELSE concat(vl.curated_countries_ids)
-		                END
+		            WHEN COALESCE(CAST(vl.curated_countries_ids AS TEXT), '') IN ('', '{}') THEN ''
+		            ELSE CAST(vl.curated_countries_ids AS TEXT)
 		        END AS countries_id
 		    FROM vendors vd
-		    left JOIN github_contributors gc ON gc.contributor = vd.username
-		    left JOIN vendor_locations vl ON vl.vendor_id = vd.id
-		    WHERE gc.purl_name IN ` + list + `
-		      AND vd.type IS NOT NULL
-		      AND vd.mine_id = 5
-		      AND vl.declared_location IS NOT NULL;`
+		    JOIN github_contributors gc ON gc.contributor = vd.username
+		    JOIN vendor_locations vl ON vl.vendor_id = vd.id
+		    WHERE gc.purl_name IN (` + placeholders(len(purlNames)) + `)
+		      AND COALESCE(vd.type, '') <> ''
+		      AND vd.mine_id = ` + githubMineID + `
+		      AND (COALESCE(vl.declared_location, '') <> ''
+		           OR COALESCE(CAST(vl.curated_countries_ids AS TEXT), '') NOT IN ('', '{}'));`
 
-	err := m.db.SelectContext(ctx, &allSources, query)
+	err := m.db.SelectContext(ctx, &allSources, query, toArgs(purlNames)...)
 	if err != nil {
 		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
@@ -115,18 +116,18 @@ func (m *ProvenanceModel) GetProvenanceByPurlNames(ctx context.Context, s *zap.S
 	return allSources, nil
 }
 
-// GetTooManyContributors get declared and curated locations for contributors and authors from a list of purlnames.
+// GetTooManyContributors returns the subset of the given purl names flagged as having too many contributors.
 func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.SugaredLogger, purlNames []string) ([]string, error) {
-	list := ""
-	list = strings.Join(purlNames, "','")
-	list = "('" + list + "')"
+	if len(purlNames) == 0 {
+		return []string{}, nil
+	}
 	var purls []string
-	query := ` 
-			select tmc.purl_name 
-			from too_many_contributors tmc 
-			where tmc.purl_name in ` + list + `
-		      AND tmc.mine_id = 5;`
-	err := m.db.SelectContext(ctx, &purls, query)
+	query := `
+			SELECT tmc.purl_name
+			FROM too_many_contributors tmc
+			WHERE tmc.purl_name IN (` + placeholders(len(purlNames)) + `)
+		      AND tmc.mine_id = ` + githubMineID + `;`
+	err := m.db.SelectContext(ctx, &purls, query, toArgs(purlNames)...)
 	if err != nil {
 		s.Errorf("Error: Failed to query %v: %+v", purlNames, err)
 		return nil, fmt.Errorf("failed to query : %v", err)
@@ -135,27 +136,21 @@ func (m *ProvenanceModel) GetTooManyContributors(ctx context.Context, s *zap.Sug
 	return purls, nil
 }
 
+// GetTimeZoneOriginByPurlName returns the number of GitHub contributors per timezone based country for a purl name.
 func (m *ProvenanceModel) GetTimeZoneOriginByPurlName(ctx context.Context, s *zap.SugaredLogger, purlName string) ([]Origin, error) {
 	var allSources []Origin
 	query := `
 		SELECT
-  vl.timezone_based_country AS country,
-  COUNT(DISTINCT v.id) AS vendor_count
-FROM
-  github_contributors gc
-JOIN
-  vendors v ON gc.contributor = v.username
-JOIN
-  vendor_locations vl ON v.id = vl.vendor_id
-WHERE
-  gc.purl_name = $1
-  AND vl.timezone_based_country IS NOT NULL 
-GROUP BY
- country
-ORDER BY
-  vendor_count DESC;
-
-`
+		  vl.timezone_based_country AS country,
+		  COUNT(DISTINCT v.id) AS vendor_count
+		FROM github_contributors gc
+		JOIN vendors v ON gc.contributor = v.username
+		JOIN vendor_locations vl ON v.id = vl.vendor_id
+		WHERE gc.purl_name = $1
+		  AND v.mine_id = ` + githubMineID + `
+		  AND COALESCE(vl.timezone_based_country, '') <> ''
+		GROUP BY vl.timezone_based_country
+		ORDER BY vendor_count DESC;`
 	err := m.db.SelectContext(ctx, &allSources, query, purlName)
 	if err != nil {
 		s.Errorf("Error: Failed to query %v: %+v", purlName, err)

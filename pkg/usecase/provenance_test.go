@@ -33,7 +33,12 @@ import (
 )
 
 func TestProvenanceUseCase(t *testing.T) {
+	for name, load := range models.TestDataSets {
+		t.Run(name, func(t *testing.T) { testProvenanceUseCase(t, load) })
+	}
+}
 
+func testProvenanceUseCase(t *testing.T, load models.TestDataLoader) {
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
@@ -53,7 +58,7 @@ func TestProvenanceUseCase(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer models.CloseConn(conn)
-	err = models.LoadTestSQLData(db, nil, nil)
+	err = load(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
@@ -74,9 +79,12 @@ func TestProvenanceUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
-	if len(countries.Provenance[0].DeclaredLocations) == 0 {
-		t.Fatalf("Expected to get at least 1 declared location")
-
+	if len(countries.Provenance[0].DeclaredLocations) != 2 {
+		t.Fatalf("Expected to get 2 declared locations, got: %v", countries.Provenance[0].DeclaredLocations)
+	}
+	curated := countries.Provenance[0].CuratedLocations
+	if len(curated) != 1 || curated[0].Country != "Argentina" || curated[0].Count != 4 {
+		t.Fatalf("Expected 4 curated locations in Argentina, got: %v", curated)
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v\n", countries)

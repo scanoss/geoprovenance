@@ -77,10 +77,13 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 	}
 
 	// Query Origin for each purl and count amount of users per each
-	mapTotal := make(map[string]int16)
+	mapTotal := make(map[string]int)
 	for _, c := range validComponents {
-		mapOrigins := make(map[string]int16)
-		tz, _ := p.provenanceModel.GetTimeZoneOriginByPurlName(ctx, s, c.Name)
+		mapOrigins := make(map[string]int)
+		tz, errTz := p.provenanceModel.GetTimeZoneOriginByPurlName(ctx, s, c.Name)
+		if errTz != nil {
+			return dtos.OriginOutput{}, errTz
+		}
 		for _, v := range tz {
 			if count, exist := mapOrigins[v.CountryName]; !exist {
 				mapOrigins[v.CountryName] = v.ContributorCount

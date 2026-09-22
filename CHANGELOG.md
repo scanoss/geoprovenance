@@ -6,6 +6,16 @@ Two endpoints are available for this.
 - Based on calculations of the user data (commits, history, timezone,name)
 
 ## [Unreleased]
+### Added
+- SQLite support: queries now return the same results on PostgreSQL and on the SQLite export (all `TEXT` columns, `''` instead of `NULL`)
+- `config/app-config-sqlite.json` sample config for a read-only SQLite database
+- SQLite-schema test fixtures (`pkg/models/tests/sqlite`); model and use case tests run against both schemas
+### Fixed
+- SQL injection in the purl name `IN (...)` lists; purl names are now bound as query parameters
+- Origin counted contributors without a timezone based country as an empty-named country (SQLite)
+- Provenance ignored curated countries of contributors with a `NULL` declared location
+- Origin counted non-GitHub vendors sharing a username with a GitHub contributor
+- Origin percentage overflow for more than 327 contributors in a country, and ignored query errors
 
 ## [0.5.0] - 2026-06-22
 ### Added

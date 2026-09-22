@@ -30,6 +30,18 @@ DB_SSL_MODE=disable
 DB_DSN=
 ```
 
+### Database
+The service supports both PostgreSQL and SQLite databases, selected with `DB_DRIVER`:
+
+* `postgres` - connects using `DB_HOST`, `DB_USER`, `DB_PASSWD`, `DB_SCHEMA` and `DB_SSL_MODE` (or a full `DB_DSN`).
+* `sqlite` - opens the database file given in `DB_DSN`. Use a `file:` URI with `mode=ro` to open it read-only, e.g.:
+  `DB_DSN=file:/path/to/provenance.sqlite?mode=ro` (without the `file:` prefix, query parameters are ignored).
+
+The SQLite export stores every column as `TEXT` and uses empty strings instead of `NULL`
+(PostgreSQL mixes both, e.g. `''` for missing declared locations and `NULL` for missing timezone countries).
+Queries are written to behave the same on both engines, and the unit tests run against both schemas
+(see [pkg/models/tests/sqlite](pkg/models/tests/sqlite)).
+
 
 ## Docker Environment
 
@@ -59,6 +71,11 @@ To run locally on your desktop, please use the following command:
 
 ```shell
 go run cmd/server/main.go -json-config config/app-config-dev.json -debug
+```
+
+To run against a local SQLite database instead:
+```shell
+DB_DSN="file:/path/to/provenance.sqlite?mode=ro" go run cmd/server/main.go -json-config config/app-config-sqlite.json -debug
 ```
 
 After changing a Provenance version, please run the following command:
