@@ -19,20 +19,25 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
-	_ "modernc.org/sqlite/lib"
+	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
 
 func TestOriginUseCase(t *testing.T) {
+	for name, load := range models.TestDataSets {
+		t.Run(name, func(t *testing.T) { testOriginUseCase(t, load) })
+	}
+}
+
+func testOriginUseCase(t *testing.T, load models.TestDataLoader) {
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
@@ -48,30 +53,7 @@ func TestOriginUseCase(t *testing.T) {
 	}
 	defer models.CloseDB(db)
 
-	conn, err := db.Connx(ctx) // Get a connection from the pool
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-
-	sqliteConn := conn.Raw(func(driverConn interface{}) error {
-		if sqliteConn, ok := driverConn.(interface {
-			CreateFunction(name string, nArg int, deterministic bool, f interface{}) error
-		}); ok {
-			// Register CONCAT function
-			err := sqliteConn.CreateFunction("CONCAT", -1, true, func(args ...string) string {
-				return strings.Join(args, "")
-			})
-			if err != nil {
-				return fmt.Errorf("error registering CONCAT: %w", err)
-			}
-		} else {
-			return fmt.Errorf("could not load SQLite connection with CreateFunction capability")
-		}
-		return nil
-	})
-	_ = sqliteConn
-	defer models.CloseConn(conn)
-	err = models.LoadTestSQLData(db, nil, nil)
+	err = load(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
@@ -91,9 +73,14 @@ func TestOriginUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
-	if len(countries.Provenance[0].Countries) == 0 {
-		t.Fatalf("Expected to get at least 1 country")
-
+	// Contributors without a timezone based country must not produce an empty country entry
+	if len(countries.Provenance[0].Countries) != 4 {
+		t.Fatalf("Expected to get 4 countries, got: %v", countries.Provenance[0].Countries)
+	}
+	for _, c := range countries.Provenance[0].Countries {
+		if c.Name == "" || c.Percentage != 25 {
+			t.Fatalf("Expected 4 named countries at 25%%, got: %v", countries.Provenance[0].Countries)
+		}
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v\n", countries)

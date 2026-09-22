@@ -1,0 +1,23 @@
+{
+  "App": {
+    "Name": "GEO Provenance Service",
+    "Debug": true,
+    "Mode":  "dev",
+    "RESTPort": "40056",
+    "GRPCPort": "50056"
+  },
+  "Database": {
+    "Driver": "sqlite",
+    "Dsn": "file:/var/lib/scanoss/db/sqlite/geoprovenance/geoprovenance.sqlite?mode=ro"
+  },
+  "TLS": {
+    "CertFile": "",
+    "KeyFile": ""
+  },
+  "Filtering": {
+    "AllowListFile": "",
+    "DenyListFile": "",
+    "BlockByDefault": false,
+    "TrustProxy": false
+  }
+}

@@ -7,9 +7,10 @@ There are two types of configuration:
 * Custom ZAP Logging Config
 
 ## App Config
-There are two configs provided here:
+There are three configs provided here:
 * Dev - [app-config-dev.json](app-config-dev.json)
 * Prod - [app-config-prod.json](app-config-prod.json)
+* SQLite (read-only, dev) - [app-config-sqlite.json](app-config-sqlite.json)
 
 A description of each field and its intended usage can be found in [server_config.go](../pkg/config/server_config.go).
 

@@ -77,3 +77,4 @@ DROP TABLE IF EXISTS too_many_contributors;
 
 CREATE TABLE
   too_many_contributors (purl_name text NOT NULL, mine_id integer NOT NULL);
+INSERT INTO too_many_contributors (purl_name, mine_id) VALUES ('torvalds/linux', 5);
