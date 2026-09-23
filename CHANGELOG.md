@@ -6,6 +6,8 @@ Two endpoints are available for this.
 - Based on calculations of the user data (commits, history, timezone,name)
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-09-23
 ### Added
 - SQLite support: queries now return the same results on PostgreSQL and on the SQLite export (all `TEXT` columns, `''` instead of `NULL`)
 - `config/app-config-sqlite.json` sample config for a read-only SQLite database
