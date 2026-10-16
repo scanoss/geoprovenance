@@ -9,34 +9,34 @@ Two endpoints are available for this.
 
 ### Changed
 - **The service now reads the serving knowledge base instead of the mining database.** The mining path is gone; there is no configuration that selects it. Endpoint routes are unchanged
-- **Contributor geography is keyed by `purl_id`.** Mining reached it through four tables - `github_contributors` linked a purl name to a contributor login, `vendors` turned that login into an id and a type, and `vendor_locations` held the location data. Serving reduces it to `contribution(purl_id → contributor_id)` → `vendor_location(vendor_id → country_id)` → `country`
-- **Both endpoints now derive from the curated country.** `curated_locations` did already; `origin` used `vendor_locations.timezone_based_country`, a country inferred from commit timezones, which serving does not carry
-- **`locations[].name` changes from an ISO code to a country name.** Mining's `timezone_based_country` held `DE`, `US`, `PL`; serving joins `country.name`, so the same component reports `Germany`, `United States`, `Poland`
+- **Contributor geography is keyed by `purl_id`.** Mining reached it through four tables - `github_contributors` linked a purl name to a contributor login, `vendors` turned that login into an id and a type, and `vendor_locations` held the location data. Serving has `contribution(purl_id → contributor_id)`, `vendor` (login, type, mine), `vendor_location` (the curated country) and `vendor_location_declared` (the declared location and the timezone-inferred country)
+- `origin` reads the timezone-inferred country from `vendor_location_declared.timezone_country`, an ISO code (`DE`, `US`) as mining's `timezone_based_country` was. An earlier revision of this branch computed it from the curated country, with full names, because the export did not carry the timezone one yet
 - Component resolution no longer goes through `go-component-helper`, which resolves against `all_urls`, `mines` and `versions` - none of which exist in the serving schema. It is replaced by `pkg/resolver`
 - The country lookup cache is now guarded by a mutex. It was a bare package-level map that every request goroutine could populate at once
 - Binaries are built with `CGO_ENABLED=1`, and the runtime image moved to `debian:bookworm-slim` with `libstdc++6`. The DuckDB driver is a cgo binding, so a pure-Go build can no longer be produced
+- A source link that points back at the component itself (11.4 of 13.9 million) is no longer followed. It cost an unindexed full scan of `component`, about 2.5 s of CPU, for a fallback that could only repeat the lookup
 
 ### Added
 - **DuckDB support**, the intended production backend for the serving knowledge base. Set `DB_DRIVER=duckdb` and `DB_PATH` to the serving file, which is opened read-only
 - `pkg/db`, opening the serving database for any of duckdb, sqlite or postgres
 - `pkg/resolver`, the serving component resolution
 - `pkg/models/test_schema.go`, holding the serving schema the tests build their database from. The fixtures under `tests/` used to carry their own `CREATE TABLE` statements, several in PostgreSQL dialect (`serial4`, `int4`)
+- `declared_locations` is populated from `vendor_location_declared`, with mining's filters: a typed vendor from the GitHub mine with a non-empty location
+- The `TOO_MANY_CONTRIBUTORS` status, from `too_many_contributors`, on both endpoints as on mining
 
 ### Security
 - **Hardened against an unimplemented method killing the server.** The service embedded the papi `GeoProvenanceServer` *interface* rather than the generated `UnimplementedGeoProvenanceServer`. The interface value is nil, so any method the service does not implement would dereference it and panic, taking the whole process down. All seven methods of the current papi interface are implemented, so nothing reaches it today - but the first method papi adds would, silently. scanoss/components shipped exactly that. Pre-existing and unrelated to the serving migration
 
 ### Removed
-- `declared_locations` is always empty. It needed `vendor_locations.declared_location` and `vendors.type`, neither of which serving carries; 1,803,028 vendors have a declared location in mining
-- The `TOO_MANY_CONTRIBUTORS` status is gone. It came from the mining `too_many_contributors` table (1,150 purls), which has no serving equivalent
 - `pkg/models/versions.go`, which queried the mining `versions` table and was never instantiated
 
 ### Fixed
 - Three tests held the pool's only connection while the code under test queried the pool, which deadlocks on an in-memory SQLite database - it is per-connection, so the pool is pinned to one. They did not deadlock before only because the queries went through the very connection they held
+- **Scoped npm packages, and other purls the export stores encoded or with qualifiers, resolve again.** `component.purl` keeps scoped npm and jsr names percent-encoded (`pkg:npm/%40angular/core`), qualifiers on generic, conda and cran keys, and a raw `+` in some rpm and deb names. The resolver decoded the purl and rebuilt the key, so 1.96 million components (6%) - plus 1.6 million qualified ones - answered `COMPONENT_NOT_FOUND` however they were spelled. It now tries the caller's spelling, the canonical rendering and the decoded form in one indexed lookup
 
 ### Deployment
 - **Breaking:** requires a serving knowledge base. Point `DB_PATH` at the `.duckdb` file and set `DB_DRIVER=duckdb`
-- **Blocker: `origin` covers far fewer components.** Mining recorded a timezone-inferred country for 2,305,059 vendors and a curated one for 256,410. Where both exist they agree on 119,906 of 120,988 (99.1%), so the answers are consistent - the curated set is simply much smaller. On 30 randomly sampled components, 38 of 89 located contributors (42%) had a timezone country and 7 (7%) a curated one, and **14 of the 21 components that resolve to an origin today would resolve to none**. The composition changes too: `pkg:github/camunda/zeebe` reports `DE 29, RU 8, IN 7, US 6, CN 5` from mining and `Germany 42.55%, Ukraine 8.51%, United States 8.51%` from serving. **Do not merge until the export carries `timezone_based_country`, or until the narrower coverage is accepted**; this is an ETL gap, not a code one
-- **The updated export adds a `vendor` table (4,347,854 rows against mining's 4,349,342), and it does not lift the blocker.** It restores `username`, `type` (User/Organization) and `mine_id`, which the declared-provenance endpoint needs - but that endpoint also needs `vendor_locations.declared_location`, and `vendor_location` is still `(vendor_id, country_id, location_date)`. Mining records a declared location for all 4,411,850 vendor locations and a timezone country for 2,305,059; serving exports neither, and `too_many_contributors` has no counterpart either. Every contributor_id sampled from `contribution` resolves against `vendor`, so the table is complete - it is the location columns that are missing
+- **The export now carries what `origin` and `declared_locations` need** (since the 2026-09-23 export, verified on 2026-10-16): `vendor_location_declared` has a timezone country for 2,305,059 vendors - the same count mining had - and a declared location for 1,825,344 rows, and `too_many_contributors` lists 1,150 components. The blocker earlier revisions of this entry recorded is lifted
 - The curated coverage itself is complete: serving's `vendor_location` has 258,386 rows (256,731 before the update) against mining's 258,681 vendors with a curated country, and `curated_countries_ids` never held more than one country, so collapsing it to a single `country_id` loses nothing
 - `contribution` covers 16,966,369 rows against `github_contributors`' 16,929,664, and `country` matches `countries` at 284 rows
 - Verified against the production serving file (72.6 GiB): both endpoints, single and batch, with unknown and invalid purls
