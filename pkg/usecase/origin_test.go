@@ -154,3 +154,25 @@ func TestOriginTooManyContributors(t *testing.T) {
 		t.Errorf("countries = %+v, want only DE", got.Provenance[0].Countries)
 	}
 }
+
+// TestTooManyContributorsWithoutData pins that a listed component with no location
+// data still reports TOO_MANY_CONTRIBUTORS, on both endpoints, rather than
+// COMPONENT_WITHOUT_INFO.
+func TestTooManyContributorsWithoutData(t *testing.T) {
+	ctx, s, db := setupUseCaseDB(t)
+	in := []componenthelper.ComponentDTO{{Purl: "pkg:github/lineageos/android_kernel_asus_sdm660"}}
+	origin, err := NewOrigin(db).GetOrigin(ctx, s, in)
+	if err != nil {
+		t.Fatalf("GetOrigin() error = %v", err)
+	}
+	if code := origin.Provenance[0].Status.StatusCode; code != domain.TooManyContributors {
+		t.Errorf("origin status = %v, want %v", code, domain.TooManyContributors)
+	}
+	countries, err := NewProvenance(db).GetProvenance(ctx, s, in)
+	if err != nil {
+		t.Fatalf("GetProvenance() error = %v", err)
+	}
+	if code := countries.Provenance[0].Status.StatusCode; code != domain.TooManyContributors {
+		t.Errorf("countries status = %v, want %v", code, domain.TooManyContributors)
+	}
+}

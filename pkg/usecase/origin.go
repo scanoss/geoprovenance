@@ -76,6 +76,9 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		if err != nil {
 			return dtos.OriginOutput{}, err
 		}
+		if tooMany[c.Name], err = p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID); err != nil {
+			return dtos.OriginOutput{}, err
+		}
 		var total int
 		for _, v := range counts {
 			total += int(v.ContributorCount)
@@ -90,9 +93,6 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 				ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100),
 			})
 		}
-		if tooMany[c.Name], err = p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID); err != nil {
-			return dtos.OriginOutput{}, err
-		}
 	}
 
 	// Create the response
@@ -100,7 +100,9 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		origins := resMaps[c.Name]
 		var origOutItem dtos.OriginOutputItem
 		origOutItem.Purl = c.Purl
-		if len(origins) == 0 {
+		// A listed component is reported as such even with no origin data; see
+		// GetProvenance.
+		if len(origins) == 0 && !tooMany[c.Name] {
 			origOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Origin data found for the given Purl",

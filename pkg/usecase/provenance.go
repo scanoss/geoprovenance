@@ -89,7 +89,14 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		if err != nil {
 			return dtos.ProvenanceOutput{}, err
 		}
-		if len(declared) == 0 && len(counts) == 0 {
+		tooMany, err := p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID)
+		if err != nil {
+			return dtos.ProvenanceOutput{}, err
+		}
+		// A listed component is reported as such even with no location data: 408
+		// of the 1,150 listed have none, and mining's order - no data first - hid
+		// the status from exactly the components it describes.
+		if len(declared) == 0 && len(counts) == 0 && !tooMany {
 			provOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Provenance data found for the given Purl",
@@ -106,10 +113,6 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 				dtos.CuratedProvenanceItem{Country: count.CountryName, Count: int(count.ContributorCount)})
 		}
 		provOutItem.Status = domain.ComponentStatus{StatusCode: domain.Success}
-		tooMany, err := p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID)
-		if err != nil {
-			return dtos.ProvenanceOutput{}, err
-		}
 		if tooMany {
 			provOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.TooManyContributors,

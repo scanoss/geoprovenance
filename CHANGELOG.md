@@ -22,7 +22,7 @@ Two endpoints are available for this.
 - `pkg/resolver`, the serving component resolution
 - `pkg/models/test_schema.go`, holding the serving schema the tests build their database from. The fixtures under `tests/` used to carry their own `CREATE TABLE` statements, several in PostgreSQL dialect (`serial4`, `int4`)
 - `declared_locations` is populated from `vendor_location_declared`, with mining's filters: a typed vendor from the GitHub mine with a non-empty location
-- The `TOO_MANY_CONTRIBUTORS` status, from `too_many_contributors`, on both endpoints as on mining
+- The `TOO_MANY_CONTRIBUTORS` status, from `too_many_contributors`, on both endpoints. Unlike mining it is reported even when the component has no location data: mining checked for data first, which hid the status from 408 of the 1,150 listed components
 
 ### Security
 - **Hardened against an unimplemented method killing the server.** The service embedded the papi `GeoProvenanceServer` *interface* rather than the generated `UnimplementedGeoProvenanceServer`. The interface value is nil, so any method the service does not implement would dereference it and panic, taking the whole process down. All seven methods of the current papi interface are implemented, so nothing reaches it today - but the first method papi adds would, silently. scanoss/components shipped exactly that. Pre-existing and unrelated to the serving migration
