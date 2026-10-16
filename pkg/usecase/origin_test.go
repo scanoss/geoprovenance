@@ -19,14 +19,17 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/jmoiron/sqlx"
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
+	"go.uber.org/zap"
 	_ "modernc.org/sqlite/lib"
 	myconfig "scanoss.com/provenance/pkg/config"
+	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
@@ -95,4 +98,59 @@ func TestOriginUseCase(t *testing.T) {
 		}
 	}
 
+}
+
+// setupUseCaseDB builds the fixture database the use cases run against.
+func setupUseCaseDB(t *testing.T) (context.Context, *zap.SugaredLogger, *sqlx.DB) {
+	t.Helper()
+	if err := zlog.NewSugaredDevLogger(); err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
+	}
+	t.Cleanup(zlog.SyncZap)
+	ctx := ctxzap.ToContext(context.Background(), zlog.L)
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { models.CloseDB(db) })
+	if err = models.LoadTestSQLData(db, nil, nil); err != nil {
+		t.Fatalf("an error '%s' was not expected when loading test data", err)
+	}
+	return ctx, ctxzap.Extract(ctx).Sugar(), db
+}
+
+// TestOriginByTimezone pins the origin on known values. It is the timezone-inferred
+// country as an ISO code, as mining returned it: of scanoss/engine's five
+// contributors with a timezone, four point to AR and one to CO.
+func TestOriginByTimezone(t *testing.T) {
+	ctx, s, db := setupUseCaseDB(t)
+	got, err := NewOrigin(db).GetOrigin(ctx, s, []componenthelper.ComponentDTO{{Purl: "pkg:github/scanoss/engine"}})
+	if err != nil {
+		t.Fatalf("GetOrigin() error = %v", err)
+	}
+	want := []dtos.CountryInfo{{Name: "AR", Percentage: 80}, {Name: "CO", Percentage: 20}}
+	if !reflect.DeepEqual(got.Provenance[0].Countries, want) {
+		t.Errorf("countries = %+v, want %+v", got.Provenance[0].Countries, want)
+	}
+	if code := got.Provenance[0].Status.StatusCode; code != domain.Success {
+		t.Errorf("status = %v, want %v", code, domain.Success)
+	}
+}
+
+// TestOriginTooManyContributors pins the status for a component listed in
+// too_many_contributors: its distribution is still returned, flagged.
+func TestOriginTooManyContributors(t *testing.T) {
+	ctx, s, db := setupUseCaseDB(t)
+	got, err := NewOrigin(db).GetOrigin(ctx, s,
+		[]componenthelper.ComponentDTO{{Purl: "pkg:github/lineageos/android_frameworks_base"}})
+	if err != nil {
+		t.Fatalf("GetOrigin() error = %v", err)
+	}
+	if code := got.Provenance[0].Status.StatusCode; code != domain.TooManyContributors {
+		t.Errorf("status = %v, want %v", code, domain.TooManyContributors)
+	}
+	if len(got.Provenance[0].Countries) != 1 || got.Provenance[0].Countries[0].Name != "DE" {
+		t.Errorf("countries = %+v, want only DE", got.Provenance[0].Countries)
+	}
 }

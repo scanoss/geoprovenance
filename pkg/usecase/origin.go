@@ -68,29 +68,30 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		}
 	}
 
-	// The distribution now comes from the curated country per contributor. Mining
-	// used vendor_locations.timezone_based_country, a country inferred from commit
-	// timezones, which serving does not carry; where mining recorded both they
-	// agree on 119,906 of 120,988 vendors, but the curated set is much smaller, so
-	// fewer components resolve to an origin at all.
+	// The distribution is by timezone-inferred country, as it was on mining: an
+	// ISO code per contributor, inferred from their commit timezones.
+	tooMany := make(map[string]bool)
 	for _, c := range validComponents {
-		counts, err := p.provenanceModel.GetCountryCountsByPurlID(ctx, s, c.PurlID)
+		counts, err := p.provenanceModel.GetTimezoneOriginByPurlID(ctx, s, c.PurlID)
 		if err != nil {
 			return dtos.OriginOutput{}, err
 		}
-		var total int16
+		var total int
 		for _, v := range counts {
-			total += v.ContributorCount
+			total += int(v.ContributorCount)
 		}
 		if total == 0 {
 			continue
 		}
 		for _, v := range counts {
-			percentage := float32(v.ContributorCount*100) / float32(total)
+			percentage := float32(int(v.ContributorCount)*100) / float32(total)
 			resMaps[c.Name] = append(resMaps[c.Name], models.LocationDistribution{
 				CountryName:           v.CountryName,
 				ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100),
 			})
+		}
+		if tooMany[c.Name], err = p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID); err != nil {
+			return dtos.OriginOutput{}, err
 		}
 	}
 
@@ -111,7 +112,10 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 			origOutItem.Countries = append(origOutItem.Countries, dtos.CountryInfo{Name: origin.CountryName /*, Developers: origin.UserCount*/, Percentage: origin.ContributorPercentage})
 		}
 
-		{
+		if tooMany[c.Name] {
+			origOutItem.Status.Message = "Too many contributors for " + c.OriginalPurl
+			origOutItem.Status.StatusCode = domain.TooManyContributors
+		} else {
 			origOutItem.Status.StatusCode = c.Status.StatusCode
 		}
 		retV.Provenance = append(retV.Provenance, origOutItem)

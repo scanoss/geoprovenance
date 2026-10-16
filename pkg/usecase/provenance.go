@@ -77,19 +77,19 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		}
 	}
 
-	// Serving records only the curated country per contributor, so the curated
-	// locations are counted straight out of it. There is no declared location, no
-	// vendor type and no too_many_contributors table, so the declared-locations
-	// part of the response has no source and stays empty.
 	for _, c := range validComponents {
 		var provOutItem dtos.ProvenanceOutputItem
 		provOutItem.Purl = c.OriginalPurl
 
+		declared, err := p.provenanceModel.GetDeclaredLocationsByPurlID(ctx, s, c.PurlID)
+		if err != nil {
+			return dtos.ProvenanceOutput{}, err
+		}
 		counts, err := p.provenanceModel.GetCountryCountsByPurlID(ctx, s, c.PurlID)
 		if err != nil {
 			return dtos.ProvenanceOutput{}, err
 		}
-		if len(counts) == 0 {
+		if len(declared) == 0 && len(counts) == 0 {
 			provOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Provenance data found for the given Purl",
@@ -97,11 +97,25 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 			retV.Provenance = append(retV.Provenance, provOutItem)
 			continue
 		}
+		for _, d := range declared {
+			provOutItem.DeclaredLocations = append(provOutItem.DeclaredLocations,
+				dtos.DeclaredProvenanceItem{Type: d.Type, Location: d.DeclaredLocation})
+		}
 		for _, count := range counts {
 			provOutItem.CuratedLocations = append(provOutItem.CuratedLocations,
 				dtos.CuratedProvenanceItem{Country: count.CountryName, Count: int(count.ContributorCount)})
 		}
 		provOutItem.Status = domain.ComponentStatus{StatusCode: domain.Success}
+		tooMany, err := p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID)
+		if err != nil {
+			return dtos.ProvenanceOutput{}, err
+		}
+		if tooMany {
+			provOutItem.Status = domain.ComponentStatus{
+				StatusCode: domain.TooManyContributors,
+				Message:    "Too many contributors for " + c.OriginalPurl,
+			}
+		}
 		retV.Provenance = append(retV.Provenance, provOutItem)
 	}
 	if len(retV.Provenance) == 0 {

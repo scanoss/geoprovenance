@@ -55,6 +55,9 @@ var testDataFiles = []string{
 	"../models/tests/component_version.sql",
 	"../models/tests/contribution.sql",
 	"../models/tests/vendor_location.sql",
+	"../models/tests/vendor_location_declared.sql",
+	"../models/tests/vendor.sql",
+	"../models/tests/too_many_contributors.sql",
 }
 
 // idempotentDDL rewrites CREATE TABLE/INDEX into their IF NOT EXISTS form so a test

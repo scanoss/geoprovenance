@@ -46,11 +46,21 @@ CREATE INDEX idx_component_version_purl_id ON component_version (purl_id);
 CREATE TABLE contribution (purl_id TEXT, contributor_id INTEGER);
 CREATE INDEX idx_contribution_purl_id ON contribution (purl_id);
 
--- Where a contributor is from. Mining's vendor_locations also carried a declared
--- location, a parsed one, a timezone-inferred country and curation metadata;
--- serving keeps only the curated country.
+-- Where a contributor is from, as curated.
 CREATE TABLE vendor_location (vendor_id INTEGER, country_id INTEGER, location_date TEXT);
 CREATE INDEX idx_vendor_location_vendor_id ON vendor_location (vendor_id);
+
+-- What a contributor declares on their profile, and the country their commit
+-- timezones point to (an ISO code). Mining kept both on vendor_locations.
+CREATE TABLE vendor_location_declared (vendor_id INTEGER, declared_location TEXT, timezone_country TEXT,
+	timezone_certainty INTEGER, location_date TEXT);
+CREATE INDEX idx_vendor_location_declared_vendor_id ON vendor_location_declared (vendor_id);
+
+CREATE TABLE vendor (id INTEGER, username TEXT, type TEXT, mine_id INTEGER);
+CREATE INDEX idx_vendor_id ON vendor (id);
+
+-- Components whose contributors were too many to mine.
+CREATE TABLE too_many_contributors (purl_id TEXT);
 
 CREATE TABLE country (id INTEGER, name TEXT, code TEXT);
 CREATE INDEX idx_country_id ON country (id);

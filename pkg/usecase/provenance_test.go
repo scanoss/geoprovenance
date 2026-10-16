@@ -19,6 +19,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -28,6 +29,7 @@ import (
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	myconfig "scanoss.com/provenance/pkg/config"
+	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
@@ -72,14 +74,15 @@ func TestProvenanceUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
-	// Serving records only the curated country per contributor, so the curated
-	// locations carry the answer and the declared ones have no source.
 	if len(countries.Provenance[0].CuratedLocations) == 0 {
 		t.Fatalf("Expected to get at least 1 curated location")
 	}
-	if len(countries.Provenance[0].DeclaredLocations) != 0 {
-		t.Errorf("declared locations = %+v, want none: the serving schema records no declared location",
-			countries.Provenance[0].DeclaredLocations)
+	// The declared locations come from vendor_location_declared. Pinned on known
+	// values, not on "not empty": an export that moved them to another column
+	// would otherwise still pass.
+	wantDeclared := []dtos.DeclaredProvenanceItem{{Type: "User", Location: "Tandil"}, {Type: "User", Location: "Argentina"}}
+	if !reflect.DeepEqual(countries.Provenance[0].DeclaredLocations, wantDeclared) {
+		t.Errorf("declared locations = %+v, want %+v", countries.Provenance[0].DeclaredLocations, wantDeclared)
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v\n", countries)
@@ -105,5 +108,19 @@ func TestProvenanceUseCase(t *testing.T) {
 	countries, err = provUc.GetProvenance(ctx, s, componentDTOS)
 	if err == nil {
 		t.Fatalf("Not found error was expected")
+	}
+}
+
+// TestProvenanceTooManyContributors pins the status mining reported for a component
+// listed in too_many_contributors.
+func TestProvenanceTooManyContributors(t *testing.T) {
+	ctx, s, db := setupUseCaseDB(t)
+	got, err := NewProvenance(db).GetProvenance(ctx, s,
+		[]componenthelper.ComponentDTO{{Purl: "pkg:github/lineageos/android_frameworks_base"}})
+	if err != nil {
+		t.Fatalf("GetProvenance() error = %v", err)
+	}
+	if code := got.Provenance[0].Status.StatusCode; code != domain.TooManyContributors {
+		t.Errorf("status = %v, want %v", code, domain.TooManyContributors)
 	}
 }
