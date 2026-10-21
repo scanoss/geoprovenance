@@ -110,7 +110,7 @@ func (p ProvenanceUseCase) GetProvenance(ctx context.Context, s *zap.SugaredLogg
 		}
 		for _, count := range counts {
 			provOutItem.CuratedLocations = append(provOutItem.CuratedLocations,
-				dtos.CuratedProvenanceItem{Country: count.CountryName, Count: int(count.ContributorCount)})
+				dtos.CuratedProvenanceItem{Country: count.CountryName, Count: count.ContributorCount})
 		}
 		provOutItem.Status = domain.ComponentStatus{StatusCode: domain.Success}
 		if tooMany {

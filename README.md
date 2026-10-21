@@ -30,6 +30,15 @@ DB_PATH=/var/lib/scanoss/serving.duckdb   # required by duckdb and sqlite; opene
 # DB_DSN=postgres://user:pass@host/db?sslmode=disable
 ```
 
+### Database
+The service reads the SCANOSS serving knowledge base, selected with `DB_DRIVER`:
+
+* `duckdb` (production) - opens the serving `.duckdb` file given in `DB_PATH`, read-only.
+* `sqlite` - opens a SQLite file holding the serving schema, given in `DB_PATH`. The unit tests use it.
+* `postgres` - connects using `DB_DSN`, against a database holding the serving schema.
+
+The mining schema (`all_urls`, `vendors`, `vendor_locations`, `github_contributors`, ...) is no longer read.
+
 
 ## Docker Environment
 
@@ -59,6 +68,11 @@ To run locally on your desktop, please use the following command:
 
 ```shell
 go run cmd/server/main.go -json-config config/app-config-dev.json -debug
+```
+
+To run against a different serving file, override its path:
+```shell
+DB_PATH=/path/to/serving.duckdb go run cmd/server/main.go -json-config config/app-config-dev.json -debug
 ```
 
 After changing a Provenance version, please run the following command:

@@ -58,7 +58,7 @@ type Provenance struct {
 // for. It backs both the curated locations and the origin distribution.
 type Origin struct {
 	CountryName      string `db:"country"`
-	ContributorCount int16  `db:"vendor_count"`
+	ContributorCount int    `db:"vendor_count"`
 }
 
 type LocationDistribution struct {
@@ -71,23 +71,30 @@ func NewProvenanceModel(db *sqlx.DB) *ProvenanceModel {
 	return &ProvenanceModel{db: db}
 }
 
-// countryCountsQuery counts a component's contributors per curated country.
+// countryCountsQuery counts a component's contributors per curated country, with
+// mining's vendor filters: a typed vendor from the GitHub mine (5).
 const countryCountsQuery = `SELECT c.name AS country, COUNT(DISTINCT vl.vendor_id) AS vendor_count
 FROM contribution ct
+INNER JOIN vendor v ON v.id = ct.contributor_id
 INNER JOIN vendor_location vl ON vl.vendor_id = ct.contributor_id
 INNER JOIN country c ON c.id = vl.country_id
-WHERE ct.purl_id = ? AND c.name IS NOT NULL AND c.name <> ''
+WHERE ct.purl_id = ? AND v.mine_id = 5 AND v.type IS NOT NULL AND v.type <> ''
+  AND c.name IS NOT NULL AND c.name <> ''
 GROUP BY c.name
 ORDER BY vendor_count DESC, country ASC`
 
 // timezoneOriginQuery counts a component's contributors per timezone-inferred
 // country, as mining's origin query did over vendor_locations.timezone_based_country.
 // The country is an ISO code (DE, US), not a name, exactly as mining returned it.
-// A vendor recorded in two countries counts in both, as it did there.
+// A vendor recorded in two countries counts in both, as it did there. Only GitHub
+// vendors (mine 5) count, as mining has since 0.6.0: other mines can share a
+// username with a GitHub contributor.
 const timezoneOriginQuery = `SELECT vld.timezone_country AS country, COUNT(DISTINCT vld.vendor_id) AS vendor_count
 FROM contribution ct
+INNER JOIN vendor v ON v.id = ct.contributor_id
 INNER JOIN vendor_location_declared vld ON vld.vendor_id = ct.contributor_id
-WHERE ct.purl_id = ? AND vld.timezone_country IS NOT NULL AND vld.timezone_country <> ''
+WHERE ct.purl_id = ? AND v.mine_id = 5
+  AND vld.timezone_country IS NOT NULL AND vld.timezone_country <> ''
 GROUP BY vld.timezone_country
 ORDER BY vendor_count DESC, country ASC`
 

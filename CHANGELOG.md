@@ -29,8 +29,10 @@ Two endpoints are available for this.
 
 ### Removed
 - `pkg/models/versions.go`, which queried the mining `versions` table and was never instantiated
+- The 0.6.0 mining-schema SQLite support: `config/app-config-sqlite.json` and the fixtures under `pkg/models/tests/sqlite` describe the mining export, which the service no longer reads. SQLite still works as a backend, holding the serving schema (`DB_DRIVER=sqlite`)
 
 ### Fixed
+- Carried over from 0.6.0 to the serving queries: `origin` counts only GitHub vendors (`vendor.mine_id = 5`), and contributor counts are `int` - an `int16` overflowed the percentage past 327 contributors in a country
 - Three tests held the pool's only connection while the code under test queried the pool, which deadlocks on an in-memory SQLite database - it is per-connection, so the pool is pinned to one. They did not deadlock before only because the queries went through the very connection they held
 - **Scoped npm packages, and other purls the export stores encoded or with qualifiers, resolve again.** `component.purl` keeps scoped npm and jsr names percent-encoded (`pkg:npm/%40angular/core`), qualifiers on generic, conda and cran keys, and a raw `+` in some rpm and deb names. The resolver decoded the purl and rebuilt the key, so 1.96 million components (6%) - plus 1.6 million qualified ones - answered `COMPONENT_NOT_FOUND` however they were spelled. It now tries the caller's spelling, the canonical rendering and the decoded form in one indexed lookup
 
@@ -41,6 +43,18 @@ Two endpoints are available for this.
 - `contribution` covers 16,966,369 rows against `github_contributors`' 16,929,664, and `country` matches `countries` at 284 rows
 - Verified against the production serving file (72.6 GiB): both endpoints, single and batch, with unknown and invalid purls
 - `make build_arm` now cross-compiles with cgo and needs an `aarch64` toolchain (set `CC`); the amd64 build is unaffected
+
+## [0.6.0] - 2026-09-23
+### Added
+- SQLite support: queries now return the same results on PostgreSQL and on the SQLite export (all `TEXT` columns, `''` instead of `NULL`)
+- `config/app-config-sqlite.json` sample config for a read-only SQLite database
+- SQLite-schema test fixtures (`pkg/models/tests/sqlite`); model and use case tests run against both schemas
+### Fixed
+- SQL injection in the purl name `IN (...)` lists; purl names are now bound as query parameters
+- Origin counted contributors without a timezone based country as an empty-named country (SQLite)
+- Provenance ignored curated countries of contributors with a `NULL` declared location
+- Origin counted non-GitHub vendors sharing a username with a GitHub contributor
+- Origin percentage overflow for more than 327 contributors in a country, and ignored query errors
 
 ## [0.5.0] - 2026-06-22
 ### Added

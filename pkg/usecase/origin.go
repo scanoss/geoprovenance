@@ -81,13 +81,13 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		}
 		var total int
 		for _, v := range counts {
-			total += int(v.ContributorCount)
+			total += v.ContributorCount
 		}
 		if total == 0 {
 			continue
 		}
 		for _, v := range counts {
-			percentage := float32(int(v.ContributorCount)*100) / float32(total)
+			percentage := float32(v.ContributorCount*100) / float32(total)
 			resMaps[c.Name] = append(resMaps[c.Name], models.LocationDistribution{
 				CountryName:           v.CountryName,
 				ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100),
