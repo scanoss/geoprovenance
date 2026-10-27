@@ -7,6 +7,8 @@ Two endpoints are available for this.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-27
+
 ### Changed
 - **The service now reads the serving knowledge base instead of the mining database.** The mining path is gone; there is no configuration that selects it. Endpoint routes are unchanged
 - **Contributor geography is keyed by `purl_id`.** Mining reached it through four tables - `github_contributors` linked a purl name to a contributor login, `vendors` turned that login into an id and a type, and `vendor_locations` held the location data. Serving has `contribution(purl_id → contributor_id)`, `vendor` (login, type, mine), `vendor_location` (the curated country) and `vendor_location_declared` (the declared location and the timezone-inferred country)
@@ -145,6 +147,7 @@ Two endpoints are available for this.
 ### Added
 - Added Dockerfile EXPOSE port
 
+[0.7.0]: https://github.com/scanoss/geoprovenance/compare/v0.6.0...v0.7.0
 [0.4.0]: https://github.com/scanoss/geoprovenance/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/scanoss/geoprovenance/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/scanoss/geoprovenance/compare/v0.1.2...v0.2.0
