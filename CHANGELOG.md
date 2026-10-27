@@ -6,8 +6,45 @@ Two endpoints are available for this.
 - Based on calculations of the user data (commits, history, timezone,name)
 
 ## [Unreleased]
+
+### Changed
+- **The service now reads the serving knowledge base instead of the mining database.** The mining path is gone; there is no configuration that selects it. Endpoint routes are unchanged
+- **Contributor geography is keyed by `purl_id`.** Mining reached it through four tables - `github_contributors` linked a purl name to a contributor login, `vendors` turned that login into an id and a type, and `vendor_locations` held the location data. Serving has `contribution(purl_id → contributor_id)`, `vendor` (login, type, mine), `vendor_location` (the curated country) and `vendor_location_declared` (the declared location and the timezone-inferred country)
+- `origin` reads the timezone-inferred country from `vendor_location_declared.timezone_country`, an ISO code (`DE`, `US`) as mining's `timezone_based_country` was. An earlier revision of this branch computed it from the curated country, with full names, because the export did not carry the timezone one yet
+- Component resolution no longer goes through `go-component-helper`, which resolves against `all_urls`, `mines` and `versions` - none of which exist in the serving schema. It is replaced by `pkg/resolver`
+- The country lookup cache is now guarded by a mutex. It was a bare package-level map that every request goroutine could populate at once
+- Binaries are built with `CGO_ENABLED=1`, and the runtime image moved to `debian:bookworm-slim` with `libstdc++6`. The DuckDB driver is a cgo binding, so a pure-Go build can no longer be produced
+- A source link that points back at the component itself (11.4 of 13.9 million) is no longer followed. It cost an unindexed full scan of `component`, about 2.5 s of CPU, for a fallback that could only repeat the lookup
+
+### Added
+- **DuckDB support**, the intended production backend for the serving knowledge base. Set `DB_DRIVER=duckdb` and `DB_PATH` to the serving file, which is opened read-only
+- `pkg/db`, opening the serving database for any of duckdb, sqlite or postgres
+- `pkg/resolver`, the serving component resolution
+- `pkg/models/test_schema.go`, holding the serving schema the tests build their database from. The fixtures under `tests/` used to carry their own `CREATE TABLE` statements, several in PostgreSQL dialect (`serial4`, `int4`)
+- `declared_locations` is populated from `vendor_location_declared`, with mining's filters: a typed vendor from the GitHub mine with a non-empty location
+- The `TOO_MANY_CONTRIBUTORS` status, from `too_many_contributors`, on both endpoints. Unlike mining it is reported even when the component has no location data: mining checked for data first, which hid the status from 408 of the 1,150 listed components
+
 ### Security
+- **Hardened against an unimplemented method killing the server.** The service embedded the papi `GeoProvenanceServer` *interface* rather than the generated `UnimplementedGeoProvenanceServer`. The interface value is nil, so any method the service does not implement would dereference it and panic, taking the whole process down. All seven methods of the current papi interface are implemented, so nothing reaches it today - but the first method papi adds would, silently. scanoss/components shipped exactly that. Pre-existing and unrelated to the serving migration
 - Upgraded `google.golang.org/grpc` to v1.83.1, `golang.org/x/net` to v0.57.0 and the OpenTelemetry modules (`otel`, `otel/sdk`, `otlptrace`, `otlptracegrpc`) to v1.45.0 to fix open Dependabot security advisories
+- `go-grpc-helper` v0.16.0 → v0.17.0. A failed REST call no longer answers `200` with an empty, unparseable body when the handler set no `x-http-code` trailer: the gateway now falls back to the standard grpc-gateway error response, and gRPC status codes map to their HTTP equivalent, so `Unimplemented` is `501` rather than `500`
+
+### Removed
+- `pkg/models/versions.go`, which queried the mining `versions` table and was never instantiated
+- The 0.6.0 mining-schema SQLite support: `config/app-config-sqlite.json` and the fixtures under `pkg/models/tests/sqlite` describe the mining export, which the service no longer reads. SQLite still works as a backend, holding the serving schema (`DB_DRIVER=sqlite`)
+
+### Fixed
+- Carried over from 0.6.0 to the serving queries: `origin` counts only GitHub vendors (`vendor.mine_id = 5`), and contributor counts are `int` - an `int16` overflowed the percentage past 327 contributors in a country
+- Three tests held the pool's only connection while the code under test queried the pool, which deadlocks on an in-memory SQLite database - it is per-connection, so the pool is pinned to one. They did not deadlock before only because the queries went through the very connection they held
+- **Scoped npm packages, and other purls the export stores encoded or with qualifiers, resolve again.** `component.purl` keeps scoped npm and jsr names percent-encoded (`pkg:npm/%40angular/core`), qualifiers on generic, conda and cran keys, and a raw `+` in some rpm and deb names. The resolver decoded the purl and rebuilt the key, so 1.96 million components (6%) - plus 1.6 million qualified ones - answered `COMPONENT_NOT_FOUND` however they were spelled. It now tries the caller's spelling, the canonical rendering and the decoded form in one indexed lookup
+
+### Deployment
+- **Breaking:** requires a serving knowledge base. Point `DB_PATH` at the `.duckdb` file and set `DB_DRIVER=duckdb`
+- **The export now carries what `origin` and `declared_locations` need** (since the 2026-09-23 export, verified on 2026-10-16): `vendor_location_declared` has a timezone country for 2,305,059 vendors - the same count mining had - and a declared location for 1,825,344 rows, and `too_many_contributors` lists 1,150 components. The blocker earlier revisions of this entry recorded is lifted
+- The curated coverage itself is complete: serving's `vendor_location` has 258,386 rows (256,731 before the update) against mining's 258,681 vendors with a curated country, and `curated_countries_ids` never held more than one country, so collapsing it to a single `country_id` loses nothing
+- `contribution` covers 16,966,369 rows against `github_contributors`' 16,929,664, and `country` matches `countries` at 284 rows
+- Verified against the production serving file (72.6 GiB): both endpoints, single and batch, with unknown and invalid purls
+- `make build_arm` now cross-compiles with cgo and needs an `aarch64` toolchain (set `CC`); the amd64 build is unaffected
 
 ## [0.6.0] - 2026-09-23
 ### Added

@@ -23,13 +23,27 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// sqliteSetup opens an in-memory SQLite database for a test.
+func sqliteSetup(t *testing.T) *sqlx.DB {
+	t.Helper()
+	db, err := sqlx.Connect("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	return db
+}
+
 func TestDbLoad(t *testing.T) {
 	db, err := sqlx.Connect("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	err = loadSQLData(db, nil, nil, "./tests/countries.sql")
+	// The fixtures carry data only, so the schema has to exist first.
+	if err = LoadTestSchema(db, nil, nil); err != nil {
+		t.Fatalf("failed to load the test schema: %v", err)
+	}
+	err = loadSQLData(db, nil, nil, "./tests/country.sql")
 	if err != nil {
 		t.Errorf("failed to load SQL test data: %v", err)
 	}

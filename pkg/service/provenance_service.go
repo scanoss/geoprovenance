@@ -32,7 +32,13 @@ import (
 )
 
 type provenanceServer struct {
-	pb.GeoProvenanceServer
+	// Embedding the generated Unimplemented struct, not the GeoProvenanceServer
+	// interface. The interface value is nil, so any method the service does not
+	// implement dereferences it and panics, taking the whole process down. Every
+	// method of the current papi interface is implemented, so nothing reaches it
+	// today - but the first method papi adds would, silently, as a remotely
+	// reachable crash. The struct answers those with an Unimplemented error.
+	pb.UnimplementedGeoProvenanceServer
 	config            *myconfig.ServerConfig
 	provenanceUseCase *usecase.ProvenanceUseCase
 	originUseCase     *usecase.OriginUseCase

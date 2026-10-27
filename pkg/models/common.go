@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -48,46 +47,61 @@ func loadSQLData(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn, filename str
 	return nil
 }
 
-// LoadTestSQLData loads all the required test SQL files.
+// testDataFiles are the data fixtures loaded on top of the schema. They carry data
+// only; the tables come from testSchemaDDL in test_schema.go.
+var testDataFiles = []string{
+	"../models/tests/country.sql",
+	"../models/tests/component.sql",
+	"../models/tests/component_version.sql",
+	"../models/tests/contribution.sql",
+	"../models/tests/vendor_location.sql",
+	"../models/tests/vendor_location_declared.sql",
+	"../models/tests/vendor.sql",
+	"../models/tests/too_many_contributors.sql",
+}
+
+// idempotentDDL rewrites CREATE TABLE/INDEX into their IF NOT EXISTS form so a test
+// can load the schema more than once. testSchemaDDL transcribes production and must
+// not carry test-only clauses, so the rewrite happens here instead of in the constant.
+func idempotentDDL(sql string) string {
+	for _, kind := range []string{"TABLE", "INDEX"} {
+		bare := "CREATE " + kind + " "
+		guarded := bare + "IF NOT EXISTS "
+		// Normalise first, so an already-guarded statement is not double-guarded.
+		sql = strings.ReplaceAll(sql, guarded, bare)
+		sql = strings.ReplaceAll(sql, bare, guarded)
+	}
+	return sql
+}
+
+// LoadTestSchema creates the serving schema in the supplied DB. Call this before
+// loading any data fixture, since the fixtures do not define their own tables.
+// It is safe to call more than once on the same DB.
+func LoadTestSchema(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error {
+	var err error
+	// Some callers pass a nil ctx, as loadSQLData's callers do, so the pooled path
+	// uses Exec rather than ExecContext.
+	if conn != nil {
+		_, err = conn.ExecContext(ctx, idempotentDDL(testSchemaDDL))
+	} else {
+		_, err = db.Exec(idempotentDDL(testSchemaDDL))
+	}
+	if err != nil {
+		return fmt.Errorf("failed to load the test schema: %w", err)
+	}
+	return nil
+}
+
+// LoadTestSQLData loads the serving schema plus all the test data fixtures.
 func LoadTestSQLData(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error {
-	files := []string{
-		"../models/tests/countries.sql",
-		"../models/tests/versions.sql",
-		"../models/tests/golang_projects.sql",
-		"../models/tests/vendor_locations.sql",
-		"../models/tests/vendors.sql",
-		"../models/tests/github_contributors.sql",
-		"../models/tests/mines.sql",
-		"../models/tests/licenses.sql",
-		"../models/tests/all_urls.sql"}
-	return loadTestSQLDataFiles(db, ctx, conn, files)
-}
-
-// LoadTestSQLiteSchemaData loads the same test data as LoadTestSQLData, but using the schema of the
-// exported SQLite provenance database (all columns TEXT, empty strings instead of NULL). See tests/sqlite/generate.sh.
-func LoadTestSQLiteSchemaData(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error {
-	files := []string{
-		"../models/tests/sqlite/db_version.sql",
-		"../models/tests/sqlite/countries.sql",
-		"../models/tests/sqlite/versions.sql",
-		"../models/tests/sqlite/vendor_locations.sql",
-		"../models/tests/sqlite/vendors.sql",
-		"../models/tests/sqlite/github_contributors.sql",
-		"../models/tests/sqlite/too_many_contributors.sql",
-		"../models/tests/sqlite/mines.sql",
-		"../models/tests/sqlite/licenses.sql",
-		"../models/tests/sqlite/all_urls.sql"}
-	return loadTestSQLDataFiles(db, ctx, conn, files)
-}
-
-// TestDataLoader loads a set of test fixtures into the supplied DB.
-type TestDataLoader func(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn) error
-
-// TestDataSets lists the fixture sets that DB backed tests should run against: the PostgreSQL
-// style schema and the schema of the exported SQLite provenance database.
-var TestDataSets = map[string]TestDataLoader{
-	"postgres-schema": LoadTestSQLData,
-	"sqlite-schema":   LoadTestSQLiteSchemaData,
+	// In-memory SQLite gives each pooled connection its OWN empty database, and the
+	// batch paths resolve concurrently, so a second connection would find no tables.
+	// Pin the pool to one so every query sees the same database.
+	db.SetMaxOpenConns(1)
+	if err := LoadTestSchema(db, ctx, conn); err != nil {
+		return err
+	}
+	return loadTestSQLDataFiles(db, ctx, conn, testDataFiles)
 }
 
 // loadTestSQLDataFiles loads a list of test SQL files.
@@ -100,25 +114,6 @@ func loadTestSQLDataFiles(db *sqlx.DB, ctx context.Context, conn *sqlx.Conn, fil
 	}
 
 	return nil
-}
-
-// placeholders returns a bind variable list ($1, $2, ..., $n) for an IN clause.
-// This numbered style is accepted by both the PostgreSQL and SQLite drivers.
-func placeholders(n int) string {
-	vars := make([]string, n)
-	for i := range vars {
-		vars[i] = "$" + strconv.Itoa(i+1)
-	}
-	return strings.Join(vars, ",")
-}
-
-// toArgs converts a list of strings into query arguments.
-func toArgs(values []string) []any {
-	args := make([]any, len(values))
-	for i, v := range values {
-		args[i] = v
-	}
-	return args
 }
 
 // CloseDB closes the specified DB and logs any errors.

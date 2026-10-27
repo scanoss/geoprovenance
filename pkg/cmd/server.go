@@ -27,13 +27,11 @@ import (
 
 	"github.com/golobby/config/v3"
 	"github.com/golobby/config/v3/pkg/feeder"
-	_ "github.com/lib/pq"
 	"github.com/scanoss/go-grpc-helper/pkg/files"
-	gd "github.com/scanoss/go-grpc-helper/pkg/grpc/database"
 	gs "github.com/scanoss/go-grpc-helper/pkg/grpc/server"
 	zlog "github.com/scanoss/zap-logging-helper/pkg/logger"
-	_ "modernc.org/sqlite"
 	myconfig "scanoss.com/provenance/pkg/config"
+	scanossdb "scanoss.com/provenance/pkg/db"
 	"scanoss.com/provenance/pkg/protocol/grpc"
 	"scanoss.com/provenance/pkg/protocol/rest"
 	"scanoss.com/provenance/pkg/service"
@@ -100,15 +98,21 @@ func RunServer() error {
 
 	zlog.S.Infof("Starting SCANOSS Provenance Service: %v", strings.TrimSpace(version))
 	// Set up the database connection pool
-	db, err := gd.OpenDBConnection(cfg.Database.Dsn, cfg.Database.Driver, cfg.Database.User, cfg.Database.Passwd,
-		cfg.Database.Host, cfg.Database.Schema, cfg.Database.SslMode)
+	// Open the serving knowledge base. The file-based drivers take a path; postgres
+	// takes an explicit DSN, or one assembled from the host settings.
+	db, err := scanossdb.Open(scanossdb.Config{
+		Driver: cfg.Database.Driver,
+		Path:   cfg.Database.Path,
+		DSN:    postgresDSN(cfg),
+	})
 	if err != nil {
 		return err
 	}
-	if err = gd.SetDBOptionsAndPing(db); err != nil {
-		return err
-	}
-	defer gd.CloseDBConnection(db)
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			zlog.S.Warnf("Problem closing the database: %v", closeErr)
+		}
+	}()
 	// Setup dynamic logging (if necessary)
 	zlog.SetupAppDynamicLogging(cfg.Logging.DynamicPort, cfg.Logging.DynamicLogging)
 
@@ -130,4 +134,20 @@ func RunServer() error {
 	}
 
 	return gs.WaitServerComplete(srv, server)
+}
+
+// postgresDSN returns the connection string for the postgres driver, assembling one
+// from the individual host settings when no explicit DSN is configured. It keeps the
+// format go-grpc-helper's OpenDBConnection used to build, so existing postgres
+// deployments read the same configuration as before. Empty for the file-based
+// drivers, which use Path instead.
+func postgresDSN(cfg *myconfig.ServerConfig) string {
+	if cfg.Database.Driver != scanossdb.DriverPostgres {
+		return ""
+	}
+	if len(cfg.Database.Dsn) > 0 {
+		return cfg.Database.Dsn
+	}
+	return fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=%s", scanossdb.DriverPostgres, cfg.Database.User,
+		cfg.Database.Passwd, cfg.Database.Host, cfg.Database.Schema, cfg.Database.SslMode)
 }

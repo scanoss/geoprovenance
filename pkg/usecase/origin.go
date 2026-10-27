@@ -20,7 +20,6 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"math"
 	_ "strings"
 
@@ -30,39 +29,37 @@ import (
 	"go.uber.org/zap"
 	"scanoss.com/provenance/pkg/dtos"
 	"scanoss.com/provenance/pkg/models"
+	"scanoss.com/provenance/pkg/resolver"
 )
+
+// originMaxWorkers caps the concurrency used when resolving a batch.
+const originMaxWorkers = 5
 
 type OriginUseCase struct {
 	provenanceModel *models.ProvenanceModel
+	resolver        *resolver.Resolver
 	db              *sqlx.DB
 }
 
 func NewOrigin(db *sqlx.DB) *OriginUseCase {
 	return &OriginUseCase{
 		db:              db,
-		provenanceModel: models.NewProvenanceModel(db)}
+		provenanceModel: models.NewProvenanceModel(db),
+		resolver:        resolver.New(nil, db)}
 }
 
 // GetOrigin takes the Provenance Input request, searches for Provenance data and returns a ProvenanceOutput struct
 //
 //goland:noinspection ALL
 func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, components []componenthelper.ComponentDTO) (dtos.OriginOutput, error) {
-	sanitizedComponents := componenthelper.GetComponentsVersion(componenthelper.ComponentVersionCfg{
-		MaxWorkers: 5,
-		DB:         p.db,
-		Ctx:        ctx,
-		S:          s,
-		Input:      components,
-	})
+	sanitizedComponents := resolver.ResolveComponents(ctx, s, p.resolver, components, originMaxWorkers)
 	resMaps := make(map[string][]models.LocationDistribution)
 	retV := dtos.OriginOutput{}
-	validComponents := make([]componenthelper.Component, 0)
-	purlNames := make([]string, 0)
+	validComponents := make([]resolver.Resolution, 0)
 	for _, component := range sanitizedComponents {
 		// Keep searching for components with  SUCCESS AND VERSION_NOT_FOUND status.
 		if component.Status.StatusCode == domain.Success || component.Status.StatusCode == domain.VersionNotFound {
 			validComponents = append(validComponents, component)
-			purlNames = append(purlNames, component.Name)
 		} else {
 			retV.Provenance = append(retV.Provenance, dtos.OriginOutputItem{
 				Purl:   component.Purl,
@@ -71,31 +68,30 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		}
 	}
 
-	tooMany, err2many := p.provenanceModel.GetTooManyContributors(ctx, s, purlNames)
-	if err2many != nil {
-		return dtos.OriginOutput{}, err2many
-	}
-
-	// Query Origin for each purl and count amount of users per each
-	mapTotal := make(map[string]int)
+	// The distribution is by timezone-inferred country, as it was on mining: an
+	// ISO code per contributor, inferred from their commit timezones.
+	tooMany := make(map[string]bool)
 	for _, c := range validComponents {
-		mapOrigins := make(map[string]int)
-		tz, errTz := p.provenanceModel.GetTimeZoneOriginByPurlName(ctx, s, c.Name)
-		if errTz != nil {
-			return dtos.OriginOutput{}, errTz
+		counts, err := p.provenanceModel.GetTimezoneOriginByPurlID(ctx, s, c.PurlID)
+		if err != nil {
+			return dtos.OriginOutput{}, err
 		}
-		for _, v := range tz {
-			if count, exist := mapOrigins[v.CountryName]; !exist {
-				mapOrigins[v.CountryName] = v.ContributorCount
-			} else {
-				mapOrigins[v.CountryName] = count + v.ContributorCount
-			}
-			mapTotal[c.Name] += v.ContributorCount
+		if tooMany[c.Name], err = p.provenanceModel.HasTooManyContributors(ctx, s, c.PurlID); err != nil {
+			return dtos.OriginOutput{}, err
 		}
-
-		for k, v := range mapOrigins {
-			var percentage = float32(v*100) / float32(mapTotal[c.Name])
-			resMaps[c.Name] = append(resMaps[c.Name], models.LocationDistribution{CountryName: k, ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100)})
+		var total int
+		for _, v := range counts {
+			total += v.ContributorCount
+		}
+		if total == 0 {
+			continue
+		}
+		for _, v := range counts {
+			percentage := float32(v.ContributorCount*100) / float32(total)
+			resMaps[c.Name] = append(resMaps[c.Name], models.LocationDistribution{
+				CountryName:           v.CountryName,
+				ContributorPercentage: float32(math.Round(float64(percentage*100)) / 100),
+			})
 		}
 	}
 
@@ -104,7 +100,9 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 		origins := resMaps[c.Name]
 		var origOutItem dtos.OriginOutputItem
 		origOutItem.Purl = c.Purl
-		if len(origins) == 0 {
+		// A listed component is reported as such even with no origin data; see
+		// GetProvenance.
+		if len(origins) == 0 && !tooMany[c.Name] {
 			origOutItem.Status = domain.ComponentStatus{
 				StatusCode: domain.ComponentWithoutInfo,
 				Message:    "No Origin data found for the given Purl",
@@ -116,9 +114,8 @@ func (p OriginUseCase) GetOrigin(ctx context.Context, s *zap.SugaredLogger, comp
 			origOutItem.Countries = append(origOutItem.Countries, dtos.CountryInfo{Name: origin.CountryName /*, Developers: origin.UserCount*/, Percentage: origin.ContributorPercentage})
 		}
 
-		if existPurl(tooMany, c.Name) {
-			msg := fmt.Sprintf("Too many contributors for %s", c.OriginalPurl)
-			origOutItem.Status.Message = msg
+		if tooMany[c.Name] {
+			origOutItem.Status.Message = "Too many contributors for " + c.OriginalPurl
 			origOutItem.Status.StatusCode = domain.TooManyContributors
 		} else {
 			origOutItem.Status.StatusCode = c.Status.StatusCode

@@ -21,26 +21,23 @@ APP_PORT=50051
 APP_MODE=dev
 APP_DEBUG=false
 
-DB_DRIVER=postgres
-DB_HOST=localhost
-DB_USER=scanoss
-DB_PASSWD=
-DB_SCHEMA=scanoss
-DB_SSL_MODE=disable
-DB_DSN=
+# The serving knowledge base. DuckDB is the production backend.
+DB_DRIVER=duckdb                    # duckdb, sqlite or postgres
+DB_PATH=/var/lib/scanoss/serving.duckdb   # required by duckdb and sqlite; opened read-only
+
+# To serve the same schema from a PostgreSQL instance instead:
+# DB_DRIVER=postgres
+# DB_DSN=postgres://user:pass@host/db?sslmode=disable
 ```
 
 ### Database
-The service supports both PostgreSQL and SQLite databases, selected with `DB_DRIVER`:
+The service reads the SCANOSS serving knowledge base, selected with `DB_DRIVER`:
 
-* `postgres` - connects using `DB_HOST`, `DB_USER`, `DB_PASSWD`, `DB_SCHEMA` and `DB_SSL_MODE` (or a full `DB_DSN`).
-* `sqlite` - opens the database file given in `DB_DSN`. Use a `file:` URI with `mode=ro` to open it read-only, e.g.:
-  `DB_DSN=file:/path/to/provenance.sqlite?mode=ro` (without the `file:` prefix, query parameters are ignored).
+* `duckdb` (production) - opens the serving `.duckdb` file given in `DB_PATH`, read-only.
+* `sqlite` - opens a SQLite file holding the serving schema, given in `DB_PATH`. The unit tests use it.
+* `postgres` - connects using `DB_DSN`, against a database holding the serving schema.
 
-The SQLite export stores every column as `TEXT` and uses empty strings instead of `NULL`
-(PostgreSQL mixes both, e.g. `''` for missing declared locations and `NULL` for missing timezone countries).
-Queries are written to behave the same on both engines, and the unit tests run against both schemas
-(see [pkg/models/tests/sqlite](pkg/models/tests/sqlite)).
+The mining schema (`all_urls`, `vendors`, `vendor_locations`, `github_contributors`, ...) is no longer read.
 
 
 ## Docker Environment
@@ -73,9 +70,9 @@ To run locally on your desktop, please use the following command:
 go run cmd/server/main.go -json-config config/app-config-dev.json -debug
 ```
 
-To run against a local SQLite database instead:
+To run against a different serving file, override its path:
 ```shell
-DB_DSN="file:/path/to/provenance.sqlite?mode=ro" go run cmd/server/main.go -json-config config/app-config-sqlite.json -debug
+DB_PATH=/path/to/serving.duckdb go run cmd/server/main.go -json-config config/app-config-dev.json -debug
 ```
 
 After changing a Provenance version, please run the following command:

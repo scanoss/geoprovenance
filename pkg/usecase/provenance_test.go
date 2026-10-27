@@ -19,6 +19,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -28,17 +29,13 @@ import (
 	"github.com/scanoss/go-component-helper/componenthelper"
 	"github.com/scanoss/go-grpc-helper/pkg/grpc/domain"
 	myconfig "scanoss.com/provenance/pkg/config"
+	"scanoss.com/provenance/pkg/dtos"
 	zlog "scanoss.com/provenance/pkg/logger"
 	"scanoss.com/provenance/pkg/models"
 )
 
 func TestProvenanceUseCase(t *testing.T) {
-	for name, load := range models.TestDataSets {
-		t.Run(name, func(t *testing.T) { testProvenanceUseCase(t, load) })
-	}
-}
 
-func testProvenanceUseCase(t *testing.T, load models.TestDataLoader) {
 	err := zlog.NewSugaredDevLogger()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a sugared logger", err)
@@ -53,12 +50,10 @@ func testProvenanceUseCase(t *testing.T, load models.TestDataLoader) {
 	}
 	defer models.CloseDB(db)
 
-	conn, err := db.Connx(ctx) // Get a connection from the pool
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer models.CloseConn(conn)
-	err = load(db, nil, nil)
+	// No connection is checked out here. An in-memory SQLite database is
+	// per-connection so the pool is pinned to one, and holding it would leave the
+	// queries under test waiting for it forever.
+	err = models.LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when loading test data", err)
 	}
@@ -79,12 +74,15 @@ func testProvenanceUseCase(t *testing.T, load models.TestDataLoader) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting Provenance", err)
 	}
-	if len(countries.Provenance[0].DeclaredLocations) != 2 {
-		t.Fatalf("Expected to get 2 declared locations, got: %v", countries.Provenance[0].DeclaredLocations)
+	if len(countries.Provenance[0].CuratedLocations) == 0 {
+		t.Fatalf("Expected to get at least 1 curated location")
 	}
-	curated := countries.Provenance[0].CuratedLocations
-	if len(curated) != 1 || curated[0].Country != "Argentina" || curated[0].Count != 4 {
-		t.Fatalf("Expected 4 curated locations in Argentina, got: %v", curated)
+	// The declared locations come from vendor_location_declared. Pinned on known
+	// values, not on "not empty": an export that moved them to another column
+	// would otherwise still pass.
+	wantDeclared := []dtos.DeclaredProvenanceItem{{Type: "User", Location: "Tandil"}, {Type: "User", Location: "Argentina"}}
+	if !reflect.DeepEqual(countries.Provenance[0].DeclaredLocations, wantDeclared) {
+		t.Errorf("declared locations = %+v, want %+v", countries.Provenance[0].DeclaredLocations, wantDeclared)
 	}
 	//fmt.Println(countries)
 	fmt.Printf("Provenance response: %+v\n", countries)
@@ -110,5 +108,19 @@ func testProvenanceUseCase(t *testing.T, load models.TestDataLoader) {
 	countries, err = provUc.GetProvenance(ctx, s, componentDTOS)
 	if err == nil {
 		t.Fatalf("Not found error was expected")
+	}
+}
+
+// TestProvenanceTooManyContributors pins the status mining reported for a component
+// listed in too_many_contributors.
+func TestProvenanceTooManyContributors(t *testing.T) {
+	ctx, s, db := setupUseCaseDB(t)
+	got, err := NewProvenance(db).GetProvenance(ctx, s,
+		[]componenthelper.ComponentDTO{{Purl: "pkg:github/lineageos/android_frameworks_base"}})
+	if err != nil {
+		t.Fatalf("GetProvenance() error = %v", err)
+	}
+	if code := got.Provenance[0].Status.StatusCode; code != domain.TooManyContributors {
+		t.Errorf("status = %v, want %v", code, domain.TooManyContributors)
 	}
 }

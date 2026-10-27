@@ -40,11 +40,9 @@ func TestCountryLookUp(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer CloseDB(db)
-	conn, err := db.Connx(ctx) // Get a connection from the pool
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer CloseConn(conn)
+	// No connection is checked out here. An in-memory SQLite database is
+	// per-connection so the pool is pinned to one, and holding it would leave the
+	// model's own queries waiting for it forever.
 	err = LoadTestSQLData(db, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to load SQL test data: %v", err)
