@@ -7,6 +7,11 @@ Two endpoints are available for this.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-27
+
+### Fixed
+- **The release workflow fails to build.** Since 0.7.1 it runs in a `golang:1.25-bookworm` container as root, over a checkout the runner owns, and git refuses such a repository, so the build could not read the version from the tag and the build stopped. The workflow now marks the workspace as a safe directory. 0.7.1 was tagged but never released
+
 ## [0.7.1] - 2026-10-27
 
 ### Fixed
@@ -152,6 +157,7 @@ Two endpoints are available for this.
 ### Added
 - Added Dockerfile EXPOSE port
 
+[0.7.2]: https://github.com/scanoss/geoprovenance/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/scanoss/geoprovenance/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/scanoss/geoprovenance/compare/v0.6.0...v0.7.0
 [0.4.0]: https://github.com/scanoss/geoprovenance/compare/v0.3.0...v0.4.0
